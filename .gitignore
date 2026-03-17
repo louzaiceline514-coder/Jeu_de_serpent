@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+env/
+venv/
+snake.db
+qtable.json
+node_modules/
+dist/
+

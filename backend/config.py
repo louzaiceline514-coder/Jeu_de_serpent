@@ -1,0 +1,41 @@
+"""Configuration globale du backend Snake AI."""
+
+from pathlib import Path
+from typing import List
+
+# Taille de la grille (carrée)
+GRID_SIZE: int = 20
+
+# Base directory du projet
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# URL de la base SQLite (fichier snake.db à la racine du projet)
+DB_PATH = BASE_DIR / "snake.db"
+DB_URL: str = f"sqlite:///{DB_PATH}"
+
+# Origines autorisées pour le CORS (frontend Vite par défaut)
+# On autorise 5173 et 5174 car Vite peut choisir un port libre.
+CORS_ORIGINS: List[str] = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5175",
+    "http://localhost:5176",
+    "http://127.0.0.1:5176",
+]
+
+# Paramètres du moteur de jeu
+TICK_INTERVAL_MS: int = 150
+
+# Paramètres du Q-Learning
+ALPHA: float = 0.1  # taux d'apprentissage
+GAMMA: float = 0.9  # facteur de réduction
+EPSILON_START: float = 1.0
+EPSILON_MIN: float = 0.01
+EPSILON_DECAY: float = 0.995
+
+# Fichier de sauvegarde de la Q-table
+QTABLE_PATH = BASE_DIR / "qtable.json"
+
