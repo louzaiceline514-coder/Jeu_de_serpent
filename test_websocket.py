@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3 python3
 """Test simple pour vérifier la connexion WebSocket."""
 
 import asyncio
