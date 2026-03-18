@@ -59,3 +59,17 @@ def test_battle_restore_conserve_la_decision_astar():
         engine.step()
         if engine.game_over:
             break
+
+
+def test_astar_ne_choisit_pas_un_demi_tour_impossible():
+    engine = MoteurJeu()
+    engine.reset(mode="battle")
+    engine.serpent.corps = [(10, 10)]
+    engine.serpent.direction = Direction.DROITE
+    engine.grille.obstacles.clear()
+    engine.grille.nourriture = (7, 15)
+
+    agent = AgentAStar()
+    direction = agent.choisir_action({"engine": engine})
+
+    assert direction != Direction.GAUCHE

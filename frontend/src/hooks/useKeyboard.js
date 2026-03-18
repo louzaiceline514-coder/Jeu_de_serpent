@@ -4,10 +4,14 @@ import { wsService } from "../services/websocket";
 
 // Hook qui écoute les flèches du clavier et envoie les directions au backend.
 
-function useKeyboard() {
+function useKeyboard(enabled = true) {
   const mode = useSelector((state) => state.game.mode);
 
   useEffect(() => {
+    if (!enabled) {
+      return undefined;
+    }
+
     const onKeyDown = (e) => {
       if (mode !== "manual") return;
       let dir = null;
@@ -22,8 +26,7 @@ function useKeyboard() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [mode]);
+  }, [enabled, mode]);
 }
 
 export default useKeyboard;
-

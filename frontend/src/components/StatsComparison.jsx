@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   LineChart,
@@ -13,37 +13,37 @@ import {
   ResponsiveContainer
 } from "recharts";
 import { fetchComparison, fetchHistory } from "../store/statsSlice";
-import { api } from "../services/api";
 
 // Composant d'affichage des statistiques comparatives A* vs RL.
 
 function StatsComparison() {
   const dispatch = useDispatch();
   const { astar, rl, history } = useSelector((state) => state.stats);
+  const lastMessage = useSelector((state) => state.ws.lastMessage);
 
   useEffect(() => {
-    console.log("📊 Chargement initial des stats...");
     dispatch(fetchComparison());
     dispatch(fetchHistory());
-  }, [dispatch]);
 
-  const handleBenchmark = async (type, episodes) => {
-    console.log(`🚀 Lancement benchmark ${type} avec ${episodes} épisodes...`);
-    
-    try {
-      console.log(`📤 Envoi de la requête à /api/training/start...`);
-      const response = await api.post("/api/training/start", { episodes, agent_type: type });
-      console.log(`📥 Réponse reçue:`, response);
-      
-      console.log(`🔄 Mise à jour des stats...`);
+    const intervalId = window.setInterval(() => {
       dispatch(fetchComparison());
       dispatch(fetchHistory());
-      console.log(`✅ Benchmark terminé et stats mises à jour`);
-    } catch (error) {
-      console.error(`❌ Erreur lors du benchmark ${type}:`, error);
-      alert(`Erreur lors du benchmark ${type}: ${error.message}`);
+    }, 2500);
+
+    return () => window.clearInterval(intervalId);
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (lastMessage?.type === "game_state" && lastMessage?.payload?.game_over) {
+      const timeoutId = window.setTimeout(() => {
+        dispatch(fetchComparison());
+        dispatch(fetchHistory());
+      }, 300);
+
+      return () => window.clearTimeout(timeoutId);
     }
-  };
+    return undefined;
+  }, [dispatch, lastMessage]);
 
   const handleExportCSV = () => {
     const rows = [
@@ -60,24 +60,30 @@ function StatsComparison() {
     URL.revokeObjectURL(url);
   };
 
-  const lineData = history.map((h, index) => ({
-    index,
-    astar: h.agent_type === "astar" ? h.score : null,
-    rl: h.agent_type === "rl" ? h.score : null
-  }));
+  const lineData = useMemo(() => {
+    const astarHistory = history.filter((entry) => entry.agent_type === "astar").slice(-20);
+    const rlHistory = history.filter((entry) => entry.agent_type === "rl").slice(-20);
+    const maxLength = Math.max(astarHistory.length, rlHistory.length);
+
+    return Array.from({ length: maxLength }, (_, index) => ({
+      game: index + 1,
+      astar: astarHistory[index]?.score ?? null,
+      rl: rlHistory[index]?.score ?? null
+    }));
+  }, [history]);
 
   const barData = [
     {
       name: "A*",
       avg: astar.avg_score,
       best: astar.best_score,
-      winRate: astar.win_rate
+      winRate: Number((astar.win_rate * 100).toFixed(1))
     },
     {
       name: "RL",
       avg: rl.avg_score,
       best: rl.best_score,
-      winRate: rl.win_rate
+      winRate: Number((rl.win_rate * 100).toFixed(1))
     }
   ];
 
@@ -97,10 +103,10 @@ function StatsComparison() {
 
       <p className="text-xs text-slate-400">
         Ces statistiques sont calculees a partir des parties réellement enregistrees en base pour A*
-        et Q-Learning.
+        et Q-Learning. La vue se rafraichit automatiquement pendant que des parties se terminent.
       </p>
 
-      <div className="grid md:grid-cols-2 gap-4 text-xs">
+      <div className="grid grid-cols-1 gap-4 text-xs">
         <div className="bg-slate-900/80 rounded-lg p-3 space-y-2">
           <p className="text-slate-400">Tableau comparatif</p>
           <table className="w-full text-left border-collapse">
@@ -131,28 +137,6 @@ function StatsComparison() {
             </tbody>
           </table>
         </div>
-
-        <div className="bg-slate-900/80 rounded-lg p-3 space-y-2">
-          <p className="text-slate-400">Benchmarks rapides</p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => handleBenchmark("astar", 50)}
-              className="flex-1 px-3 py-1 rounded bg-emerald-500 text-slate-900 text-xs font-medium"
-            >
-              Lancer 50 parties A*
-            </button>
-            <button
-              onClick={() => handleBenchmark("rl", 50)}
-              className="flex-1 px-3 py-1 rounded bg-sky-500 text-slate-900 text-xs font-medium"
-            >
-              Lancer 50 parties RL
-            </button>
-          </div>
-          <p className="text-[11px] text-slate-400">
-            Ces boutons lancent des séries de 50 parties côté backend et mettent à jour les
-            statistiques agrégées.
-          </p>
-        </div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
@@ -164,7 +148,7 @@ function StatsComparison() {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={lineData}>
                 <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
-                <XAxis dataKey="index" stroke="#64748b" />
+                <XAxis dataKey="game" stroke="#64748b" />
                 <YAxis stroke="#64748b" />
                 <Tooltip />
                 <Legend />
@@ -188,7 +172,7 @@ function StatsComparison() {
                 <Legend />
                 <Bar dataKey="avg" fill="#22c55e" name="Score moyen" />
                 <Bar dataKey="best" fill="#a855f7" name="Meilleur score" />
-                <Bar dataKey="winRate" fill="#38bdf8" name="Taux de survie" />
+                <Bar dataKey="winRate" fill="#38bdf8" name="Taux de survie (%)" />
               </BarChart>
             </ResponsiveContainer>
           </div>

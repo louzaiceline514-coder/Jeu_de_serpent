@@ -9,16 +9,27 @@ function ControlPanel() {
   const dispatch = useDispatch();
   const { mode, score, gameOver } = useSelector((state) => state.game);
   const { connected } = useSelector((state) => state.ws);
-  const [paused, setPaused] = useState(false);
+  const [paused, setPaused] = useState(true);
   const [speed, setSpeed] = useState(150);
+  const [started, setStarted] = useState(false);
 
   const changeMode = (newMode) => {
     dispatch(setMode(newMode));
     wsService.send("set_mode", { mode: newMode });
+    setPaused(true);
+    setStarted(false);
+  };
+
+  const handleStart = () => {
+    wsService.send("start", {});
+    setPaused(false);
+    setStarted(true);
   };
 
   const handleReset = () => {
     wsService.send("reset", {});
+    setPaused(true);
+    setStarted(false);
   };
 
   const handlePauseToggle = () => {
@@ -34,7 +45,7 @@ function ControlPanel() {
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 h-full">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-slate-200">Contrôles</span>
         <span
@@ -77,14 +88,21 @@ function ControlPanel() {
       <div className="space-y-3">
         <div className="flex gap-2">
           <button
+            onClick={handleStart}
+            className="flex-1 px-3 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-sm text-slate-950 font-semibold border border-emerald-300"
+          >
+            {started ? "Reprendre" : "Start"}
+          </button>
+          <button
             onClick={handleReset}
             className="flex-1 px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sm text-slate-100 border border-slate-700"
           >
-            Start / Reset
+            Reset
           </button>
           <button
             onClick={handlePauseToggle}
-            className="flex-1 px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sm text-slate-100 border border-slate-700"
+            disabled={!started}
+            className="flex-1 px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sm text-slate-100 border border-slate-700 disabled:opacity-50"
           >
             {paused ? "Reprendre" : "Pause"}
           </button>
@@ -111,4 +129,3 @@ function ControlPanel() {
 }
 
 export default ControlPanel;
-

@@ -28,7 +28,10 @@ const initialState = {
   astar: { avg_score: 0, best_score: 0, games_played: 0, win_rate: 0 },
   rl: { avg_score: 0, best_score: 0, games_played: 0, win_rate: 0 },
   history: [],
-  trainingScores: [],
+  rlTrainingScores: [],
+  astarBenchmarkScores: [],
+  rlTrainingSummary: { episodes: 0, avg_score: 0, best_score: 0, survival_rate: 0 },
+  astarBenchmarkSummary: { episodes: 0, avg_score: 0, best_score: 0, survival_rate: 0 },
   loading: false
 };
 
@@ -50,10 +53,13 @@ const statsSlice = createSlice({
         state.history = action.payload || [];
       })
       .addCase(fetchTrainingResults.fulfilled, (state, action) => {
-        state.trainingScores = action.payload.scores || [];
+        state.rlTrainingScores = action.payload.rl_scores || [];
+        state.astarBenchmarkScores = action.payload.astar_scores || [];
+        state.rlTrainingSummary = action.payload.rl_summary || state.rlTrainingSummary;
+        state.astarBenchmarkSummary =
+          action.payload.astar_summary || state.astarBenchmarkSummary;
       });
   }
 });
 
 export default statsSlice.reducer;
-

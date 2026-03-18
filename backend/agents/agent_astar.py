@@ -157,8 +157,11 @@ class AgentAStar(Agent):
         obstacles: Set[Coord],
         nourriture: Coord | None,
         direction: Direction,
+        current_direction: Direction | None = None,
     ) -> Optional[Tuple[int, int, int, int, int]]:
         """Calcule un score global privilégiant la survie puis la progression."""
+        if current_direction is not None and direction == Direction.opposite(current_direction):
+            return None
         nx = corps[0][0] + direction.dx
         ny = corps[0][1] + direction.dy
         if not grille.est_dans_grille(nx, ny):
@@ -188,13 +191,21 @@ class AgentAStar(Agent):
         corps: List[Coord],
         obstacles: Set[Coord],
         nourriture: Coord | None,
+        current_direction: Direction,
     ) -> Optional[Direction]:
         """Mode survie fort pour l'arène: suivre la queue tant qu'une pomme n'est pas clairement sûre."""
         if len(corps) > 1:
             queue_path = self._astar(grille, corps[0], corps[-1], set(corps[1:-1]) | obstacles)
             if queue_path and len(queue_path) >= 2:
                 direction = self._direction_depuis_deplacement(queue_path[0], queue_path[1])
-                score = self._score_direction(grille, corps, obstacles, nourriture, direction)
+                score = self._score_direction(
+                    grille,
+                    corps,
+                    obstacles,
+                    nourriture,
+                    direction,
+                    current_direction,
+                )
                 if score is not None and score[0] >= 1 and score[2] >= 5:
                     return direction
         return None
@@ -205,14 +216,28 @@ class AgentAStar(Agent):
         corps = list(moteur.serpent.corps)
         obstacles = set(grille.obstacles)
         nourriture = grille.nourriture
+        current_direction = moteur.serpent.direction
 
-        tail_direction = self._choose_tail_first_direction(grille, corps, obstacles, nourriture)
+        tail_direction = self._choose_tail_first_direction(
+            grille,
+            corps,
+            obstacles,
+            nourriture,
+            current_direction,
+        )
 
         if nourriture is not None:
             chemin_food = self._astar(grille, corps[0], nourriture, set(corps[1:]) | obstacles)
             if chemin_food and len(chemin_food) >= 2:
                 direction_food = self._direction_depuis_deplacement(chemin_food[0], chemin_food[1])
-                score_food = self._score_direction(grille, corps, obstacles, nourriture, direction_food)
+                score_food = self._score_direction(
+                    grille,
+                    corps,
+                    obstacles,
+                    nourriture,
+                    direction_food,
+                    current_direction,
+                )
                 if score_food is not None and score_food[0] >= 1 and score_food[2] >= 7:
                     return direction_food
 
@@ -221,7 +246,14 @@ class AgentAStar(Agent):
 
         scores: List[Tuple[Tuple[int, int, int, int, int], Direction]] = []
         for direction in Direction:
-            score = self._score_direction(grille, corps, obstacles, nourriture, direction)
+            score = self._score_direction(
+                grille,
+                corps,
+                obstacles,
+                nourriture,
+                direction,
+                current_direction,
+            )
             if score is not None:
                 scores.append((score, direction))
         if not scores:
@@ -236,6 +268,7 @@ class AgentAStar(Agent):
         corps = list(moteur.serpent.corps)
         obstacles = set(grille.obstacles)
         nourriture = grille.nourriture
+        current_direction = moteur.serpent.direction
 
         if moteur.mode == "battle":
             return self._choose_battle_action(moteur)
@@ -247,7 +280,10 @@ class AgentAStar(Agent):
         chemin = self._astar(grille, corps[0], nourriture, set(corps[1:]) | obstacles)
         if chemin and len(chemin) >= 2:
             direction = self._direction_depuis_deplacement(chemin[0], chemin[1])
-            simulation = self._simuler_etat(corps, direction, nourriture)
+            if direction != Direction.opposite(current_direction):
+                simulation = self._simuler_etat(corps, direction, nourriture)
+            else:
+                simulation = (None, False)
             if simulation[0] is not None:
                 queue_path_len = self._longueur_chemin_queue(grille, simulation[0], obstacles)
                 espace = self._espace_libre(
@@ -261,7 +297,14 @@ class AgentAStar(Agent):
 
         scores: List[Tuple[Tuple[int, int, int, int, int], Direction]] = []
         for direction in Direction:
-            score = self._score_direction(grille, corps, obstacles, nourriture, direction)
+            score = self._score_direction(
+                grille,
+                corps,
+                obstacles,
+                nourriture,
+                direction,
+                current_direction,
+            )
             if score is not None:
                 scores.append((score, direction))
 

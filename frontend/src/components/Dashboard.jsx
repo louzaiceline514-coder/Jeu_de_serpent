@@ -7,7 +7,7 @@ function Dashboard() {
   const { score, stepCount, mode, gameOver } = useSelector((state) => state.game);
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 h-full">
       <h2 className="text-sm font-medium text-slate-200">Dashboard temps réel</h2>
       <div className="grid grid-cols-2 gap-3 text-xs">
         <div className="bg-slate-800/60 rounded-lg p-2">
@@ -38,4 +38,3 @@ function Dashboard() {
 }
 
 export default Dashboard;
-

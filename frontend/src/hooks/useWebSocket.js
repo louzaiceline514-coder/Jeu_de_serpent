@@ -6,11 +6,17 @@ import { wsService } from "../services/websocket";
 
 // Hook custom pour gérer la connexion WebSocket et dispatcher les états de jeu.
 
-function useWebSocket() {
+function useWebSocket(enabled = true) {
   const dispatch = useDispatch();
   const alreadyConnectedRef = useRef(false);
 
   useEffect(() => {
+    if (!enabled) {
+      alreadyConnectedRef.current = false;
+      wsService.disconnect();
+      return undefined;
+    }
+
     // En mode dev, React.StrictMode peut monter/démonter 2 fois : on évite une double connexion WS.
     if (alreadyConnectedRef.current) return;
     alreadyConnectedRef.current = true;
@@ -23,8 +29,6 @@ function useWebSocket() {
       url,
       () => {
         dispatch(wsConnected());
-        // On force un reset pour recevoir un premier état immédiatement.
-        wsService.send("reset", {});
       },
       (data) => {
         dispatch(wsMessage(data));
@@ -41,7 +45,7 @@ function useWebSocket() {
       alreadyConnectedRef.current = false;
       wsService.disconnect();
     };
-  }, [dispatch]);
+  }, [dispatch, enabled]);
 }
 
 export default useWebSocket;

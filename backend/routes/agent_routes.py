@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -91,53 +90,6 @@ def _select_agent(agent_type: str) -> Any:
     raise HTTPException(status_code=400, detail=f"Agent type non supporte: {agent_type}")
 
 
-def _compute_safety_score(moteur: MoteurJeu, direction: Direction) -> float:
-    grille = moteur.grille
-    nx = moteur.serpent.tete[0] + direction.dx
-    ny = moteur.serpent.tete[1] + direction.dy
-    if not grille.est_dans_grille(nx, ny):
-        return 0.0
-    if (nx, ny) in grille.obstacles:
-        return 0.0
-    if (nx, ny) in list(moteur.serpent.corps)[1:]:
-        return 0.0
-
-    blocked = set(grille.obstacles) | set(moteur.serpent.corps[1:])
-    stack = [(nx, ny)]
-    visited: set[tuple[int, int]] = set()
-    while stack:
-        x, y = stack.pop()
-        if (x, y) in visited or (x, y) in blocked:
-            continue
-        visited.add((x, y))
-        for voisin in grille.obtenir_voisins(x, y):
-            if voisin not in visited and voisin not in blocked:
-                stack.append(voisin)
-
-    free_cells = (grille.largeur * grille.hauteur) - len(blocked)
-    if free_cells <= 0:
-        return 0.0
-    return min(1.0, len(visited) / free_cells)
-
-
-def _build_agent_message(agent_type: str, moteur: MoteurJeu, direction: Direction, safety_score: float) -> str:
-    food = moteur.grille.nourriture
-    next_head = (moteur.serpent.tete[0] + direction.dx, moteur.serpent.tete[1] + direction.dy)
-
-    if agent_type == "astar":
-        if food == next_head:
-            return "Chemin optimal trouve vers la nourriture"
-        if safety_score >= 0.65:
-            return "Analyse de securite favorable, zone ouverte"
-        return "Mode survie actif, sortie de piege privilegiee"
-
-    if food == next_head:
-        return "Exploitation de la Q-Table vers la nourriture"
-    if safety_score < 0.35:
-        return "Evitement de collision detecte"
-    return "Politique stable dans une zone sure"
-
-
 @router.post("/init")
 def init_agent_game(request: AgentInitRequest) -> dict:
     """Initialise un etat de jeu cohérent directement depuis le backend."""
@@ -157,25 +109,10 @@ def agent_step(request: AgentStepRequest) -> dict:
     agent = _select_agent(request.agent_type)
 
     if not moteur.game_over:
-        started_at = time.perf_counter()
         direction = agent.choisir_action({"engine": moteur})
-        inference_ms = (time.perf_counter() - started_at) * 1000.0
-        safety_score = _compute_safety_score(moteur, direction)
-        analysis = _build_agent_message(request.agent_type, moteur, direction, safety_score)
         moteur.changer_direction(direction)
         moteur.step()
-    else:
-        inference_ms = 0.0
-        safety_score = 0.0
-        analysis = "Partie terminee"
 
     return {
         "payload": moteur.get_state_dict(),
-        "meta": {
-            "agent_type": request.agent_type,
-            "inference_ms": round(inference_ms, 3),
-            "epsilon": round(float(getattr(agent, "epsilon", 0.0)), 4),
-            "safety_score": round(safety_score, 4),
-            "analysis": analysis,
-        },
     }

@@ -2,17 +2,13 @@
 
 from __future__ import annotations
 
-import csv
-from pathlib import Path
 import time
 from typing import Callable, List, Optional
 
 from agents.agent_rl import AgentQL
-from database import SessionLocal
 from game_engine.moteur import MoteurJeu
-from models.agent import Agent
-from models.game import Game
-from models.stats import AgentStats
+import csv
+from pathlib import Path
 
 
 class Trainer:
@@ -48,17 +44,7 @@ class Trainer:
         self._en_cours = True
         self._scores = []
 
-        # Boucle d'entraînement avec persistance des parties en base
-        db = SessionLocal()
         try:
-            # Récupération ou création de l'agent RL
-            agent = db.query(Agent).filter(Agent.type == "rl").first()
-            if agent is None:
-                agent = Agent(name="Q-Learning", type="rl")
-                db.add(agent)
-                db.commit()
-                db.refresh(agent)
-
             for episode in range(1, nb_episodes + 1):
                 # Reset de l'environnement et mesure du temps
                 self.moteur.reset(mode="rl")
@@ -67,60 +53,12 @@ class Trainer:
                 # Une session d'entraînement dans l'environnement
                 scores = self.agent.entrainer(1, self.moteur)
                 score = int(scores[-1]) if scores else 0
-                duration = float(time.time() - start_time)
-                nb_steps = self.moteur.step_count
-
-                # Sauvegarde de la partie dans la table Game
-                game = Game(
-                    agent_id=agent.id,
-                    score=score,
-                    nb_steps=nb_steps,
-                    duration=duration,
-                )
-                db.add(game)
-
-                # Mise à jour des statistiques agrégées
-                stats = db.query(AgentStats).filter(AgentStats.agent_id == agent.id).first()
-                if stats is None:
-                    stats = AgentStats(
-                        agent_id=agent.id,
-                        games_played=0,
-                        avg_score=0.0,
-                        best_score=0,
-                        win_rate=0.0,
-                    )
-                    db.add(stats)
-
-                if stats.games_played is None:
-                    stats.games_played = 0
-                if stats.avg_score is None:
-                    stats.avg_score = 0.0
-                if stats.best_score is None:
-                    stats.best_score = 0
-                if stats.win_rate is None:
-                    stats.win_rate = 0.0
-
-                # mise à jour incrémentale
-                old_games = stats.games_played
-                stats.games_played = stats.games_played + 1
-                stats.best_score = max(stats.best_score, score)
-                stats.avg_score = (
-                    (stats.avg_score * old_games + score) / stats.games_played
-                    if stats.games_played > 0
-                    else 0.0
-                )
-                wins = stats.win_rate * old_games
-                if score > 0:
-                    wins += 1
-                stats.win_rate = wins / stats.games_played if stats.games_played > 0 else 0.0
-
-                db.commit()
+                _ = float(time.time() - start_time)
 
                 self._scores.append(score)
                 if callback_progression:
                     callback_progression(episode, nb_episodes, score)
         finally:
-            db.close()
             self._en_cours = False
 
         # Sauvegarde des scores dans un fichier CSV

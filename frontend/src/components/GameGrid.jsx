@@ -5,7 +5,7 @@ import Snake from "./Snake";
 
 function GameGrid() {
   return (
-    <div className="flex flex-col items-center justify-center h-full space-y-4">
+    <div className="flex flex-col items-center justify-center h-full min-h-[70vh] space-y-4">
       <Snake />
       <p className="text-xs text-slate-400">
         Contrôles clavier en mode manuel : flèches directionnelles.
@@ -15,4 +15,3 @@ function GameGrid() {
 }
 
 export default GameGrid;
-
