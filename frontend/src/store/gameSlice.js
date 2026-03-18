@@ -9,7 +9,8 @@ const initialState = {
   mode: "manual", // manual | astar | rl
   gameOver: false,
   gridSize: 20,
-  stepCount: 0
+  stepCount: 0,
+  direction: "DROITE"
 };
 
 const gameSlice = createSlice({
@@ -25,6 +26,7 @@ const gameSlice = createSlice({
       state.gameOver = payload.game_over ?? false;
       state.mode = payload.mode || state.mode;
       state.stepCount = payload.step_count ?? 0;
+      state.direction = payload.direction || state.direction;
     },
     setMode(state, action) {
       state.mode = action.payload;
@@ -34,4 +36,3 @@ const gameSlice = createSlice({
 
 export const { setGameState, setMode } = gameSlice.actions;
 export default gameSlice.reducer;
-

@@ -15,7 +15,9 @@ function useWebSocket() {
     if (alreadyConnectedRef.current) return;
     alreadyConnectedRef.current = true;
 
-    const url = "ws://localhost:8000/ws";
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const host = window.location.hostname;
+    const url = import.meta.env.DEV ? `${protocol}//${host}:5173/ws` : `${protocol}//${host}:8000/ws`;
 
     wsService.connect(
       url,
@@ -34,8 +36,12 @@ function useWebSocket() {
         dispatch(wsDisconnected());
       }
     );
+
+    return () => {
+      alreadyConnectedRef.current = false;
+      wsService.disconnect();
+    };
   }, [dispatch]);
 }
 
 export default useWebSocket;
-

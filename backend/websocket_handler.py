@@ -12,9 +12,13 @@ from starlette.websockets import WebSocketDisconnect
 
 from agents.agent_astar import AgentAStar
 from agents.agent_rl import AgentQL
-from config import TICK_INTERVAL_MS
+from config import EPSILON_MIN, TICK_INTERVAL_MS
+from database import SessionLocal
 from game_engine.direction import Direction
 from game_engine.moteur import MoteurJeu
+from models.agent import Agent
+from models.game import Game
+from models.stats import AgentStats
 
 
 class GameWebSocketManager:
@@ -23,11 +27,12 @@ class GameWebSocketManager:
     def __init__(self) -> None:
         self.engine = MoteurJeu()
         self.agent_astar = AgentAStar()
-        self.agent_rl = AgentQL()
+        self.agent_rl = AgentQL(epsilon=EPSILON_MIN)
         self._running = False
         self._last_tick = time.time()
         self._paused = False
         self._tick_ms = TICK_INTERVAL_MS
+        self._game_saved = False
 
     async def handle(self, websocket: WebSocket) -> None:
         """Boucle principale de gestion du WebSocket."""
@@ -66,6 +71,9 @@ class GameWebSocketManager:
                         self.engine.changer_direction(direction)
 
                     self.engine.step()
+                    if self.engine.game_over and not self._game_saved:
+                        self._enregistrer_partie()
+                        self._game_saved = True
 
                 message = {
                     "type": "game_state",
@@ -89,6 +97,7 @@ class GameWebSocketManager:
                 if msg_type == "set_mode":
                     mode = data.get("mode", "manual")
                     self.engine.reset(mode=mode)
+                    self._game_saved = False
                 elif msg_type == "direction":
                     dir_str = data.get("dir")
                     direction = self._parse_direction(dir_str)
@@ -96,6 +105,7 @@ class GameWebSocketManager:
                         self.engine.changer_direction(direction)
                 elif msg_type == "reset":
                     self.engine.reset(mode=self.engine.mode)
+                    self._game_saved = False
                 elif msg_type == "set_paused":
                     self._paused = bool(data.get("paused", False))
                 elif msg_type == "set_speed":
@@ -194,4 +204,3 @@ class GameWebSocketManager:
             db.commit()
         finally:
             db.close()
-

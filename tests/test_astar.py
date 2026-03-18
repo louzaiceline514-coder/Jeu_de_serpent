@@ -3,6 +3,7 @@
 from agents.agent_astar import AgentAStar
 from game_engine.direction import Direction
 from game_engine.moteur import MoteurJeu
+from routes.agent_routes import _restore_engine
 
 
 def _prepare_engine_with_food():
@@ -42,3 +43,19 @@ def test_direction_depuis_deplacement():
     d = agent._direction_depuis_deplacement((0, 0), (1, 0))
     assert d == Direction.DROITE
 
+
+def test_battle_restore_conserve_la_decision_astar():
+    engine = MoteurJeu()
+    engine.reset(mode="battle")
+    agent = AgentAStar()
+
+    for _ in range(8):
+        direction_originale = agent.choisir_action({"engine": engine})
+        engine_restaure = _restore_engine(engine.get_state_dict())
+        direction_restauree = agent.choisir_action({"engine": engine_restaure})
+        assert direction_originale == direction_restauree
+
+        engine.changer_direction(direction_originale)
+        engine.step()
+        if engine.game_over:
+            break

@@ -62,8 +62,8 @@ function StatsComparison() {
 
   const lineData = history.map((h, index) => ({
     index,
-    astar: h.agent_type === "astar" ? h.score : 0,
-    rl: h.agent_type === "rl" ? h.score : 0
+    astar: h.agent_type === "astar" ? h.score : null,
+    rl: h.agent_type === "rl" ? h.score : null
   }));
 
   const barData = [
@@ -94,6 +94,11 @@ function StatsComparison() {
           Export CSV
         </button>
       </div>
+
+      <p className="text-xs text-slate-400">
+        Ces statistiques sont calculees a partir des parties réellement enregistrees en base pour A*
+        et Q-Learning.
+      </p>
 
       <div className="grid md:grid-cols-2 gap-4 text-xs">
         <div className="bg-slate-900/80 rounded-lg p-3 space-y-2">
@@ -194,4 +199,3 @@ function StatsComparison() {
 }
 
 export default StatsComparison;
-

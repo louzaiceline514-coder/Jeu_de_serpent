@@ -121,6 +121,7 @@ class Trainer:
                     callback_progression(episode, nb_episodes, score)
         finally:
             db.close()
+            self._en_cours = False
 
         # Sauvegarde des scores dans un fichier CSV
         self.sortie_csv.parent.mkdir(parents=True, exist_ok=True)
@@ -129,6 +130,3 @@ class Trainer:
             writer.writerow(["episode", "score"])
             for i, score in enumerate(self._scores):
                 writer.writerow([i + 1, score])
-
-        self._en_cours = False
-

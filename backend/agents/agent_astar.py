@@ -5,10 +5,10 @@ from __future__ import annotations
 import heapq
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from agents.base_agent import Agent
 from game_engine.direction import Direction
 from game_engine.grille import Grille
 from game_engine.moteur import MoteurJeu
-from agents.base_agent import Agent
 
 Coord = Tuple[int, int]
 
@@ -45,7 +45,6 @@ class AgentAStar(Agent):
         came_from: Dict[Coord, Coord] = {}
         g_score: Dict[Coord, int] = {depart: 0}
         f_score: Dict[Coord, int] = {depart: self._heuristique(depart, objectif)}
-
         visited: Set[Coord] = set()
 
         while open_set:
@@ -71,16 +70,16 @@ class AgentAStar(Agent):
         """Convertit deux coordonnées adjacentes en une direction."""
         dx = dst[0] - src[0]
         dy = dst[1] - src[1]
-        for d in Direction:
-            if (d.dx, d.dy) == (dx, dy):
-                return d
+        for direction in Direction:
+            if (direction.dx, direction.dy) == (dx, dy):
+                return direction
         return Direction.DROITE
 
     def _espace_libre(self, grille: Grille, tete: Coord, forbidden: Set[Coord]) -> int:
-        """Estime grossièrement l'espace libre accessible (flood fill simplifié)."""
+        """Estime l'espace libre accessible via flood fill."""
         stack = [tete]
         vus: Set[Coord] = set()
-        while stack and len(vus) < 100:  # limite pour rester léger
+        while stack and len(vus) < 200:
             x, y = stack.pop()
             if (x, y) in vus or (x, y) in forbidden:
                 continue
@@ -90,35 +89,184 @@ class AgentAStar(Agent):
                     stack.append(voisin)
         return len(vus)
 
+    def _simuler_etat(
+        self,
+        corps: List[Coord],
+        direction: Direction,
+        nourriture: Coord | None,
+    ) -> tuple[Optional[List[Coord]], bool]:
+        """Simule un déplacement et retourne le nouveau corps."""
+        tete_x, tete_y = corps[0]
+        nouvelle_tete = (tete_x + direction.dx, tete_y + direction.dy)
+        if nouvelle_tete in corps[1:]:
+            return None, False
+
+        nouveau_corps = [nouvelle_tete] + list(corps)
+        mange = nourriture == nouvelle_tete
+        if not mange:
+            nouveau_corps.pop()
+        return nouveau_corps, mange
+
+    def _peut_rejoindre_queue(
+        self,
+        grille: Grille,
+        corps: List[Coord],
+        obstacles: Set[Coord],
+    ) -> bool:
+        """Vérifie si la tête peut rejoindre la queue avec le corps simulé."""
+        if len(corps) <= 1:
+            return True
+        tete = corps[0]
+        queue = corps[-1]
+        forbidden = set(corps[1:-1]) | obstacles
+        return self._astar(grille, tete, queue, forbidden) is not None
+
+    def _longueur_chemin_queue(
+        self,
+        grille: Grille,
+        corps: List[Coord],
+        obstacles: Set[Coord],
+    ) -> Optional[int]:
+        """Retourne la longueur du chemin vers la queue depuis un état simulé."""
+        if len(corps) <= 1:
+            return 0
+        chemin = self._astar(grille, corps[0], corps[-1], set(corps[1:-1]) | obstacles)
+        if chemin is None:
+            return None
+        return len(chemin)
+
+    def _longueur_chemin_nourriture(
+        self,
+        grille: Grille,
+        corps: List[Coord],
+        obstacles: Set[Coord],
+        nourriture: Coord | None,
+    ) -> Optional[int]:
+        """Retourne la longueur du chemin vers la nourriture depuis un état simulé."""
+        if nourriture is None:
+            return None
+        chemin = self._astar(grille, corps[0], nourriture, set(corps[1:]) | obstacles)
+        if chemin is None:
+            return None
+        return len(chemin)
+
+    def _score_direction(
+        self,
+        grille: Grille,
+        corps: List[Coord],
+        obstacles: Set[Coord],
+        nourriture: Coord | None,
+        direction: Direction,
+    ) -> Optional[Tuple[int, int, int, int, int]]:
+        """Calcule un score global privilégiant la survie puis la progression."""
+        nx = corps[0][0] + direction.dx
+        ny = corps[0][1] + direction.dy
+        if not grille.est_dans_grille(nx, ny):
+            return None
+        if (nx, ny) in obstacles:
+            return None
+
+        simulation = self._simuler_etat(corps, direction, nourriture)
+        if simulation[0] is None:
+            return None
+        nouveau_corps, _ = simulation
+
+        queue_path_len = self._longueur_chemin_queue(grille, nouveau_corps, obstacles)
+        tail_access = 1 if queue_path_len is not None else 0
+        espace = self._espace_libre(grille, nouveau_corps[0], set(nouveau_corps[1:]) | obstacles)
+        marge = espace - len(nouveau_corps)
+        safety_band = 1 if tail_access and marge >= 4 else 0
+        food_path_len = self._longueur_chemin_nourriture(grille, nouveau_corps, obstacles, nourriture)
+        food_score = -food_path_len if food_path_len is not None else -10_000
+        distance_food = -self._heuristique(nouveau_corps[0], nourriture) if nourriture else 0
+        queue_score = -(queue_path_len or 10_000)
+        return (safety_band, tail_access, marge, queue_score, max(food_score, distance_food))
+
+    def _choose_tail_first_direction(
+        self,
+        grille: Grille,
+        corps: List[Coord],
+        obstacles: Set[Coord],
+        nourriture: Coord | None,
+    ) -> Optional[Direction]:
+        """Mode survie fort pour l'arène: suivre la queue tant qu'une pomme n'est pas clairement sûre."""
+        if len(corps) > 1:
+            queue_path = self._astar(grille, corps[0], corps[-1], set(corps[1:-1]) | obstacles)
+            if queue_path and len(queue_path) >= 2:
+                direction = self._direction_depuis_deplacement(queue_path[0], queue_path[1])
+                score = self._score_direction(grille, corps, obstacles, nourriture, direction)
+                if score is not None and score[0] >= 1 and score[2] >= 5:
+                    return direction
+        return None
+
+    def _choose_battle_action(self, moteur: MoteurJeu) -> Direction:
+        """Politique spéciale battle: survie longue avant score immédiat."""
+        grille = moteur.grille
+        corps = list(moteur.serpent.corps)
+        obstacles = set(grille.obstacles)
+        nourriture = grille.nourriture
+
+        tail_direction = self._choose_tail_first_direction(grille, corps, obstacles, nourriture)
+
+        if nourriture is not None:
+            chemin_food = self._astar(grille, corps[0], nourriture, set(corps[1:]) | obstacles)
+            if chemin_food and len(chemin_food) >= 2:
+                direction_food = self._direction_depuis_deplacement(chemin_food[0], chemin_food[1])
+                score_food = self._score_direction(grille, corps, obstacles, nourriture, direction_food)
+                if score_food is not None and score_food[0] >= 1 and score_food[2] >= 7:
+                    return direction_food
+
+        if tail_direction is not None:
+            return tail_direction
+
+        scores: List[Tuple[Tuple[int, int, int, int, int], Direction]] = []
+        for direction in Direction:
+            score = self._score_direction(grille, corps, obstacles, nourriture, direction)
+            if score is not None:
+                scores.append((score, direction))
+        if not scores:
+            return moteur.serpent.direction
+        scores.sort(key=lambda item: item[0], reverse=True)
+        return scores[0][1]
+
     def choisir_action(self, state: Dict[str, Any]) -> Direction:
-        """Choisit une direction vers la nourriture ou, à défaut, maximise l'espace libre."""
+        """Choisit une direction sûre et efficace pour continuer à survivre."""
         moteur: MoteurJeu = state["engine"]
         grille = moteur.grille
-        tete = moteur.serpent.tete
-        corps = list(moteur.serpent.corps)[1:]
-        forbidden: Set[Coord] = set(corps) | grille.obstacles
+        corps = list(moteur.serpent.corps)
+        obstacles = set(grille.obstacles)
+        nourriture = grille.nourriture
 
-        if not grille.nourriture:
+        if moteur.mode == "battle":
+            return self._choose_battle_action(moteur)
+
+        if not nourriture:
             return moteur.serpent.direction
 
-        chemin = self._astar(grille, tete, grille.nourriture, forbidden)
+        # Tentative directe : chemin vers la nourriture seulement si l'état d'arrivée reste viable.
+        chemin = self._astar(grille, corps[0], nourriture, set(corps[1:]) | obstacles)
         if chemin and len(chemin) >= 2:
-            return self._direction_depuis_deplacement(chemin[0], chemin[1])
+            direction = self._direction_depuis_deplacement(chemin[0], chemin[1])
+            simulation = self._simuler_etat(corps, direction, nourriture)
+            if simulation[0] is not None:
+                queue_path_len = self._longueur_chemin_queue(grille, simulation[0], obstacles)
+                espace = self._espace_libre(
+                    grille,
+                    simulation[0][0],
+                    set(simulation[0][1:]) | obstacles,
+                )
+                marge = espace - len(simulation[0])
+                if queue_path_len is not None and marge >= 4:
+                    return direction
 
-        # Fallback : choisir la direction qui maximise l'espace libre
-        meilleures_directions: List[Tuple[int, Direction]] = []
+        scores: List[Tuple[Tuple[int, int, int, int, int], Direction]] = []
         for direction in Direction:
-            nx, ny = tete[0] + direction.dx, tete[1] + direction.dy
-            if not grille.est_dans_grille(nx, ny):
-                continue
-            if (nx, ny) in forbidden:
-                continue
-            espace = self._espace_libre(grille, (nx, ny), forbidden)
-            meilleures_directions.append((espace, direction))
+            score = self._score_direction(grille, corps, obstacles, nourriture, direction)
+            if score is not None:
+                scores.append((score, direction))
 
-        if not meilleures_directions:
+        if not scores:
             return moteur.serpent.direction
 
-        meilleures_directions.sort(key=lambda x: x[0], reverse=True)
-        return meilleures_directions[0][1]
-
+        scores.sort(key=lambda item: item[0], reverse=True)
+        return scores[0][1]

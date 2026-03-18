@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import math
 import random
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from config import (
     ALPHA,
@@ -25,11 +25,11 @@ StateKey = Tuple[int, ...]
 class AgentQL(Agent):
     """Agent Q-Learning avec encodage d'état binaire (11 features)."""
 
-    def __init__(self) -> None:
+    def __init__(self, epsilon: Optional[float] = None) -> None:
         super().__init__(name="Q-Learning")
         self.alpha = ALPHA
         self.gamma = GAMMA
-        self.epsilon = 0.1  # Réduit pour plus d'exploitation
+        self.epsilon = EPSILON_START if epsilon is None else epsilon
         self.q_table: Dict[str, List[float]] = {}
         self.actions = [Direction.GAUCHE, Direction.DROITE, Direction.HAUT, Direction.BAS]
         self.charger_qtable()
@@ -44,15 +44,46 @@ class AgentQL(Agent):
             self.q_table[key] = [0.0 for _ in self.actions]
         return self.q_table[key]
 
+    def _is_safe_direction(self, moteur: MoteurJeu, direction: Direction) -> bool:
+        tete_x, tete_y = moteur.serpent.tete
+        nx, ny = tete_x + direction.dx, tete_y + direction.dy
+        if not moteur.grille.est_dans_grille(nx, ny):
+            return False
+        if (nx, ny) in moteur.grille.obstacles:
+            return False
+        if (nx, ny) in list(moteur.serpent.corps)[1:]:
+            return False
+        return True
+
+    def _safe_actions(self, moteur: MoteurJeu) -> List[Direction]:
+        return [direction for direction in self.actions if self._is_safe_direction(moteur, direction)]
+
+    def _distance_to_food(self, moteur: MoteurJeu, direction: Direction) -> float:
+        if moteur.grille.nourriture is None:
+            return 0.0
+        nx = moteur.serpent.tete[0] + direction.dx
+        ny = moteur.serpent.tete[1] + direction.dy
+        fx, fy = moteur.grille.nourriture
+        return abs(fx - nx) + abs(fy - ny)
+
     def sauvegarder_qtable(self) -> None:
         """Sauvegarde la Q-table dans un fichier JSON."""
-        QTABLE_PATH.write_text(json.dumps(self.q_table))
+        QTABLE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        QTABLE_PATH.write_text(json.dumps(self.q_table), encoding="utf-8")
 
     def charger_qtable(self) -> None:
         """Charge la Q-table depuis le fichier JSON si disponible."""
         if QTABLE_PATH.exists():
             try:
-                self.q_table = json.loads(QTABLE_PATH.read_text())
+                loaded = json.loads(QTABLE_PATH.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    self.q_table = {
+                        str(key): [float(value) for value in values]
+                        for key, values in loaded.items()
+                        if isinstance(values, list)
+                    }
+                else:
+                    self.q_table = {}
             except Exception:
                 self.q_table = {}
 
@@ -129,14 +160,35 @@ class AgentQL(Agent):
         moteur: MoteurJeu = state["engine"]
         encoded = self.encoder_etat(moteur)
         q_vals = self.obtenir_q_valeurs(encoded)
+        safe_actions = self._safe_actions(moteur)
+
+        if not safe_actions:
+            return moteur.serpent.direction
 
         if random.random() < self.epsilon:
-            action_index = random.randint(0, len(self.actions) - 1)
-        else:
-            max_q = max(q_vals)
-            meilleurs = [i for i, q in enumerate(q_vals) if math.isclose(q, max_q) or q == max_q]
-            action_index = random.choice(meilleurs)
-        return self.actions[action_index]
+            return random.choice(safe_actions)
+
+        scored_actions = []
+        for index, direction in enumerate(self.actions):
+            if direction not in safe_actions:
+                continue
+            scored_actions.append((q_vals[index], -self._distance_to_food(moteur, direction), direction))
+
+        if not scored_actions:
+            return random.choice(safe_actions)
+
+        max_q = max(score for score, _, _ in scored_actions)
+        meilleures = [
+            direction
+            for score, _, direction in scored_actions
+            if math.isclose(score, max_q) or score == max_q
+        ]
+
+        if len(meilleures) == 1:
+            return meilleures[0]
+
+        meilleures.sort(key=lambda direction: self._distance_to_food(moteur, direction))
+        return meilleures[0]
 
     def update_Q(
         self,
@@ -163,7 +215,7 @@ class AgentQL(Agent):
         scores: List[float] = []
 
         for _ in range(nb_episodes):
-            env.reset(mode="rl")
+            env.reset(mode="training")
             state = self.encoder_etat(env)
             prev_score = env.score
 
@@ -210,4 +262,3 @@ class AgentQL(Agent):
 
         self.sauvegarder_qtable()
         return scores
-

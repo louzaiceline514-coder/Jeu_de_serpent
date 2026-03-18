@@ -23,6 +23,15 @@ class Serpent:
         """Retourne la position de la tête."""
         return self.corps[0]
 
+    @property
+    def croissance_en_attente(self) -> bool:
+        """Indique si le serpent doit grandir au prochain déplacement."""
+        return self._doit_grandir
+
+    @croissance_en_attente.setter
+    def croissance_en_attente(self, value: bool) -> None:
+        self._doit_grandir = bool(value)
+
     def changer_direction(self, nouvelle_direction: Direction) -> None:
         """Change la direction si ce n'est pas un demi-tour."""
         if nouvelle_direction == Direction.opposite(self.direction):
@@ -53,4 +62,3 @@ class Serpent:
         if self.tete in self.corps[1:]:
             return True
         return False
-

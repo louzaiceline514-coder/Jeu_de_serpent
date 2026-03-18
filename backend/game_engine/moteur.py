@@ -1,12 +1,13 @@
-"""Moteur de jeu central pour le Snake (état, step, reset)."""
+"""Moteur de jeu central pour le Snake (etat, step, reset)."""
 
 from __future__ import annotations
 
+import random
 import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-from config import GRID_SIZE
+from config import GRID_SIZE, OBSTACLE_SETTINGS
 from game_engine.direction import Direction
 from game_engine.grille import Grille
 from game_engine.serpent import Serpent
@@ -16,15 +17,18 @@ Coord = Tuple[int, int]
 
 @dataclass
 class GameState:
-    """Structure d'état du jeu pour sérialisation."""
+    """Structure d'etat du jeu pour serialisation."""
 
     snake: List[Coord]
     food: Optional[Coord]
     obstacles: List[Coord]
+    dynamic_obstacles: List[Tuple[int, int, int]]
     score: int
     game_over: bool
     mode: str
     step_count: int
+    direction: str
+    growth_pending: bool
 
 
 class MoteurJeu:
@@ -35,17 +39,75 @@ class MoteurJeu:
         self.serpent = Serpent(GRID_SIZE // 2, GRID_SIZE // 2, Direction.DROITE)
         self.score: int = 0
         self.game_over: bool = False
-        self.mode: str = "manual"  # manual | astar | rl | training
+        self.mode: str = "manual"
         self.step_count: int = 0
         self.start_time: float = time.time()
-        # Obstacles : on en met en mode manuel/A* ; on les désactive en RL par défaut
-        # (un agent RL non entraîné meurt sinon très vite, ce qui donne l'impression qu'il "ne marche pas").
-        nb_obstacles = 0 if self.mode in ("rl", "training") else 20
-        self.grille.generer_obstacles(nb_obstacles=nb_obstacles, forbidden=set(self.serpent.corps))
-        self.grille.generer_nourriture(forbidden=set(self.serpent.corps) | self.grille.obstacles)
+        self.static_obstacles: set[Coord] = set()
+        self.dynamic_obstacles: Dict[Coord, int] = {}
+        self.reset(mode=self.mode)
+
+    def _mode_settings(self) -> Dict[str, int]:
+        return OBSTACLE_SETTINGS.get(self.mode, OBSTACLE_SETTINGS["manual"])
+
+    def _forbidden_cells(self) -> set[Coord]:
+        forbidden = set(self.serpent.corps)
+        if self.grille.nourriture:
+            forbidden.add(self.grille.nourriture)
+        return forbidden
+
+    def _refresh_obstacles(self) -> None:
+        self.grille.obstacles = set(self.static_obstacles) | set(self.dynamic_obstacles)
+
+    def _spawn_dynamic_obstacle(self) -> None:
+        settings = self._mode_settings()
+        if settings["max_dynamic_obstacles"] <= 0:
+            return
+        if len(self.dynamic_obstacles) >= settings["max_dynamic_obstacles"]:
+            return
+
+        forbidden = self._forbidden_cells() | self.grille.obstacles
+        libres = [
+            (x, y)
+            for x in range(self.grille.largeur)
+            for y in range(self.grille.hauteur)
+            if (x, y) not in forbidden
+        ]
+        if not libres:
+            return
+
+        coord = random.choice(libres)
+        self.dynamic_obstacles[coord] = 0
+        self._refresh_obstacles()
+
+    def _update_dynamic_obstacles(self) -> None:
+        settings = self._mode_settings()
+        if settings["max_dynamic_obstacles"] <= 0:
+            return
+
+        lifetime = settings["dynamic_lifetime"]
+        updated: Dict[Coord, int] = {}
+        for coord, age in self.dynamic_obstacles.items():
+            next_age = age + 1
+            if next_age < lifetime and coord not in self.serpent.corps:
+                updated[coord] = next_age
+        self.dynamic_obstacles = updated
+        self._refresh_obstacles()
+
+        if self.step_count > 0 and self.step_count % settings["spawn_interval"] == 0:
+            self._spawn_dynamic_obstacle()
+
+    def _init_obstacles(self) -> None:
+        settings = self._mode_settings()
+        self.dynamic_obstacles = {}
+        self.grille.generer_obstacles(
+            nb_obstacles=settings["static_obstacles"],
+            forbidden=set(self.serpent.corps),
+        )
+        self.static_obstacles = set(self.grille.obstacles)
+        self._refresh_obstacles()
 
     def reset(self, mode: Optional[str] = None) -> None:
-        """Réinitialise complètement le jeu."""
+        """Reinitialise completement le jeu."""
         self.grille = Grille(GRID_SIZE, GRID_SIZE)
         self.serpent = Serpent(GRID_SIZE // 2, GRID_SIZE // 2, Direction.DROITE)
         self.score = 0
@@ -54,12 +116,11 @@ class MoteurJeu:
         self.start_time = time.time()
         if mode is not None:
             self.mode = mode
-        nb_obstacles = 0 if self.mode in ("rl", "training") else 20
-        self.grille.generer_obstacles(nb_obstacles=nb_obstacles, forbidden=set(self.serpent.corps))
-        self.grille.generer_nourriture(forbidden=set(self.serpent.corps) | self.grille.obstacles)
+        self._init_obstacles()
+        self.grille.generer_nourriture(forbidden=self._forbidden_cells() | self.grille.obstacles)
 
     def changer_direction(self, direction: Direction) -> None:
-        """Met à jour la direction du serpent (utilisé en mode manuel ou IA)."""
+        """Met a jour la direction du serpent."""
         self.serpent.changer_direction(direction)
 
     def step(self) -> None:
@@ -70,44 +131,53 @@ class MoteurJeu:
         self.serpent.se_deplacer()
         self.step_count += 1
 
-        # Collision murs ou corps
         if self.serpent.verifier_collision(self.grille.largeur, self.grille.hauteur):
             self.game_over = True
             return
 
-        # Collision obstacles
         if self.serpent.tete in self.grille.obstacles:
             self.game_over = True
             return
 
-        # Gestion nourriture
         if self.grille.nourriture and self.serpent.tete == self.grille.nourriture:
             self.score += 1
             self.serpent.grandir()
-            self.grille.generer_nourriture(forbidden=set(self.serpent.corps) | self.grille.obstacles)
+            self.grille.generer_nourriture(forbidden=self._forbidden_cells() | self.grille.obstacles)
+            if self.grille.nourriture is None:
+                self.game_over = True
+                return
+
+        self._update_dynamic_obstacles()
 
     def get_state(self) -> GameState:
-        """Retourne l'état courant sous forme d'objet GameState."""
+        """Retourne l'etat courant sous forme d'objet GameState."""
         return GameState(
             snake=list(self.serpent.corps),
             food=self.grille.nourriture,
-            obstacles=list(self.grille.obstacles),
+            obstacles=sorted(self.grille.obstacles),
+            dynamic_obstacles=sorted((x, y, age) for (x, y), age in self.dynamic_obstacles.items()),
             score=self.score,
             game_over=self.game_over,
             mode=self.mode,
             step_count=self.step_count,
+            direction=self.serpent.direction.name,
+            growth_pending=self.serpent.croissance_en_attente,
         )
 
     def get_state_dict(self) -> Dict:
-        """Retourne l'état courant sous forme de dictionnaire sérialisable JSON."""
+        """Retourne l'etat courant sous forme de dictionnaire serialisable JSON."""
         state = self.get_state()
         return {
             "snake": [{"x": x, "y": y} for (x, y) in state.snake],
             "food": {"x": state.food[0], "y": state.food[1]} if state.food else None,
             "obstacles": [{"x": x, "y": y} for (x, y) in state.obstacles],
+            "dynamic_obstacles": [
+                {"x": x, "y": y, "age": age} for (x, y, age) in state.dynamic_obstacles
+            ],
             "score": state.score,
             "game_over": state.game_over,
             "mode": state.mode,
             "step_count": state.step_count,
+            "direction": state.direction,
+            "growth_pending": state.growth_pending,
         }
-

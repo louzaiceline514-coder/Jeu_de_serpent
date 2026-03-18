@@ -4,13 +4,17 @@ class WSService {
   constructor() {
     this.ws = null;
     this.url = null;
-    this.dispatch = null;
     this.reconnectDelay = 1000;
     this._shouldReconnect = true;
+    this._reconnectTimeout = null;
   }
 
   connect(url, onOpen, onMessage, onClose) {
     this.url = url;
+    if (this._reconnectTimeout) {
+      clearTimeout(this._reconnectTimeout);
+      this._reconnectTimeout = null;
+    }
     // Si une connexion existe déjà, on la ferme proprement avant d'en ouvrir une nouvelle.
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       try {
@@ -40,12 +44,24 @@ class WSService {
 
     this.ws.onclose = () => {
       if (onClose) onClose();
-      setTimeout(() => {
+      this._reconnectTimeout = setTimeout(() => {
         if (this.url && this._shouldReconnect) {
           this.connect(this.url, onOpen, onMessage, onClose);
         }
       }, this.reconnectDelay);
     };
+  }
+
+  disconnect() {
+    this._shouldReconnect = false;
+    if (this._reconnectTimeout) {
+      clearTimeout(this._reconnectTimeout);
+      this._reconnectTimeout = null;
+    }
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
   }
 
   send(type, payload) {
@@ -56,4 +72,3 @@ class WSService {
 }
 
 export const wsService = new WSService();
-
