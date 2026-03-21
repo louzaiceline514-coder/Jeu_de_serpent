@@ -74,6 +74,13 @@ npm install
 
 ## Lancement
 
+### Lancement automatique (recommandé)
+
+Double-cliquez sur **`start.bat`** à la racine du projet.  
+Le script démarre le backend, le frontend, et ouvre automatiquement le navigateur sur **`http://localhost:5174`**.
+
+### Lancement manuel
+
 Ouvrir **deux terminaux** :
 
 **Terminal 1 – Backend :**
@@ -91,7 +98,7 @@ cd frontend
 npm run dev
 ```
 
-L'application est accessible sur **`http://localhost:5173`**.
+L'application est accessible sur **`http://localhost:5174`**.
 
 > Si vous avez déjà une base `snake.db` d'une version précédente, supprimez-la avant de relancer le backend afin que les nouvelles tables (game_events, rl_training) soient créées.
 
@@ -208,7 +215,7 @@ Les données sont récupérées depuis les routes `/api/stats/comparison` et `/a
 
 ```bash
 cd backend
-pytest ../tests/ -v
+python -m pytest tests/ -v
 ```
 
 Couverture :
@@ -315,6 +322,7 @@ SnakeGAME_final/
 │   ├── test_astar.py
 │   ├── test_rl.py
 │   └── test_api.py
+├── start.bat                    # Script de lancement automatique (Windows)
 ├── qtable.json                 # Q-table sauvegardée (générée à l'entraînement)
 ├── training_results.csv        # Scores par épisode (généré à l'entraînement)
 ├── snake.db                    # Base SQLite (générée au premier lancement)
@@ -345,7 +353,7 @@ Elle contient 5 tables :
 | Problème | Solution |
 |---|---|
 | `uvicorn: command not found` | `pip install uvicorn` dans l'environnement Python actif |
-| Erreur CORS au lancement | Vérifier que le frontend tourne sur le port 5173 (ou ajouter le port dans `config.py`) |
+| Erreur CORS au lancement | Vérifier que le frontend tourne sur le port 5174 (ou ajouter le port dans `config.py`) |
 | WebSocket déconnecté | Relancer le backend, puis rafraîchir le frontend |
 | Q-table vide / mauvaises performances RL | Lancer un entraînement depuis le panneau Entraînement (au moins 50 épisodes) |
 | `snake.db` avec tables manquantes | Supprimer `snake.db`, relancer `uvicorn main:app --reload --port 8000` |
