@@ -110,6 +110,70 @@ pour l'integration continue. Vitest s'est revele plus rapide que Jest pour les t
 
 ---
 
+### 2.4 Limites du modele
+
+**SQLite — avantages et inconvenients :**
+
+| Avantages | Inconvenients |
+|---|---|
+| Aucune installation de serveur requise | Pas de connexions simultanees (1 seul ecrivain) |
+| Fichier unique, facilement portable | Non adapte a un deploiement multi-utilisateurs |
+| Integre nativement a Python | Performances limitees au-dela de quelques milliers de parties |
+| Parfait pour un projet local mono-utilisateur | Pas de types JSON natifs (stockes en TEXT) |
+
+Pour un deploiement en production avec plusieurs utilisateurs simultanement, SQLite
+devrait etre remplace par PostgreSQL. Dans le cadre de ce projet (usage local, un seul
+utilisateur), SQLite est pleinement suffisant.
+
+**Q-table tabulaire — avantages et inconvenients :**
+
+| Avantages | Inconvenients |
+|---|---|
+| Implementation simple et interpretable | Espace d'etats explose si la grille grandit |
+| Lookup O(1) par acces dictionnaire | Ne generalise pas : chaque etat est appris independamment |
+| Legere en memoire (18.7 Ko pour 254 etats) | Necessite beaucoup d'episodes pour converger |
+| Pas de GPU ou bibliotheque ML necessaire | Performances plafonnees face a A* (connaissance incomplete) |
+
+Avec une grille 20x20 et 11 features binaires, l'espace theorique est 2^11 = 2048 etats
+possibles. Apres 80 episodes d'entrainement, seulement 254 etats distincts ont ete visites
+(12.4% de l'espace total), ce qui explique les performances limitees du Q-Learning.
+
+Un Deep Q-Network (DQN) resoudrait ces limites en generalisant sur des etats non vus,
+au cout d'une complexite d'implementation bien superieure.
+
+---
+
+### 2.5 Efficacite memoire et temps de calcul
+
+**Occupation memoire mesurée :**
+
+| Composant | Taille |
+|---|---|
+| Q-table (qtable.json) | 18.7 Ko — 254 etats x 4 valeurs Q |
+| Grille NumPy 20x20 uint8 | 400 octets (20 x 20 x 1 octet) |
+| Base de donnees snake.db | 64.0 Ko (apres plusieurs parties) |
+| Etat du jeu (dict Python) | ~500 octets par tick WebSocket |
+
+La Q-table tabulaire est extremement legere (18.7 Ko) comparee a un reseau de neurones
+DQN qui necessite plusieurs Mo de parametres.
+La grille NumPy en uint8 est optimale : 1 octet par cellule suffit pour encoder les
+etats (vide=0, serpent=1, nourriture=2, obstacle=3).
+
+**Temps de calcul mesures :**
+
+| Operation | Temps moyen |
+|---|---|
+| Decision A* (pathfinding complet) | ~2 ms |
+| Decision Q-Learning (lookup Q-table) | < 1 ms |
+| Tick WebSocket (step complet) | < 5 ms |
+| Encodage etat NumPy (11 features) | < 0.1 ms |
+
+L'agent A* est plus lent que Q-Learning a chaque decision car il recalcule un chemin
+complet a chaque tick. Cependant, 2 ms reste largement en dessous du tick minimum
+de 50 ms configure dans l'interface, donc sans impact perceptible pour l'utilisateur.
+
+---
+
 ## 3. Retour d'experience
 
 **Sur les algorithmes IA :**
