@@ -14,6 +14,6 @@ start "Frontend - Vite" cmd /k "cd /d %~dp0frontend && npm run dev"
 timeout /t 4 /nobreak > nul
 
 echo [3/3] Ouverture du navigateur...
-start http://localhost:5173
+start http://localhost:5174
 
 echo Snake AI est pret !
