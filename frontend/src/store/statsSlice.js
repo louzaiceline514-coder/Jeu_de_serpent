@@ -49,6 +49,9 @@ const statsSlice = createSlice({
         state.astar = action.payload.astar || state.astar;
         state.rl = action.payload.rl || state.rl;
       })
+      .addCase(fetchComparison.rejected, (state) => {
+        state.loading = false;
+      })
       .addCase(fetchHistory.fulfilled, (state, action) => {
         state.history = action.payload || [];
       })

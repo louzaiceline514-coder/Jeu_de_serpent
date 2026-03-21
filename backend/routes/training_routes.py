@@ -63,6 +63,9 @@ def start_training(payload: TrainingRequest) -> dict:
     if payload.agent_type == "rl":
         trainer = get_trainer()
         trainer.entrainer(episodes, callback_progression=None)
+        # Invalide le singleton RL de la BattleArena pour qu'il recharge la Q-table à jour
+        from routes.agent_routes import reset_rl_singleton
+        reset_rl_singleton()
         return {
             "status": "finished",
             "agent_type": "rl",

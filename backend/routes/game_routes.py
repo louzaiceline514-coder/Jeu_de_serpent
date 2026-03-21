@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends
 
 from database import SessionLocal
@@ -15,6 +17,7 @@ router = APIRouter(prefix="/api/game", tags=["game"])
 
 # Moteur de jeu global simple pour les appels REST (le WebSocket aura son propre cycle)
 _engine = MoteurJeu()
+_game_saved = False
 
 
 def get_engine() -> MoteurJeu:
@@ -25,6 +28,8 @@ def get_engine() -> MoteurJeu:
 @router.post("/start")
 def start_game(engine: MoteurJeu = Depends(get_engine)) -> dict:
     """Démarre une nouvelle partie."""
+    global _game_saved
+    _game_saved = False
     engine.reset()
     return {"status": "started", "state": engine.get_state_dict()}
 
@@ -32,16 +37,20 @@ def start_game(engine: MoteurJeu = Depends(get_engine)) -> dict:
 @router.post("/step")
 def step_game(engine: MoteurJeu = Depends(get_engine)) -> dict:
     """Effectue un pas de jeu."""
+    global _game_saved
     engine.step()
-    # Si la partie vient de se terminer, on enregistre les stats en base
-    if engine.game_over:
+    # Enregistre la partie une seule fois au moment où elle se termine
+    if engine.game_over and not _game_saved:
         _save_game_and_stats(engine)
+        _game_saved = True
     return {"state": engine.get_state_dict()}
 
 
 @router.post("/reset")
 def reset_game(engine: MoteurJeu = Depends(get_engine)) -> dict:
     """Réinitialise la partie."""
+    global _game_saved
+    _game_saved = False
     engine.reset()
     return {"status": "reset", "state": engine.get_state_dict()}
 
@@ -73,6 +82,11 @@ def _save_game_and_stats(engine: MoteurJeu) -> None:
             score=score,
             nb_steps=nb_steps,
             duration=duration,
+            longueur_serpent=len(engine.serpent.corps),
+            cause_mort=engine.cause_mort or "inconnu",
+            taille_grille=f"{engine.grille.largeur}x{engine.grille.hauteur}",
+            obstacles_actifs=len(engine.grille.obstacles) > 0,
+            date_fin=datetime.utcnow(),
         )
         db.add(game)
 

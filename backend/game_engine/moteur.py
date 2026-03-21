@@ -39,6 +39,7 @@ class MoteurJeu:
         self.serpent = Serpent(GRID_SIZE // 2, GRID_SIZE // 2, Direction.DROITE)
         self.score: int = 0
         self.game_over: bool = False
+        self.cause_mort: str = ""
         self.mode: str = "manual"
         self.step_count: int = 0
         self.start_time: float = time.time()
@@ -114,6 +115,7 @@ class MoteurJeu:
         self.game_over = False
         self.step_count = 0
         self.start_time = time.time()
+        self.cause_mort = ""
         if mode is not None:
             self.mode = mode
         self._init_obstacles()
@@ -131,12 +133,24 @@ class MoteurJeu:
         self.serpent.se_deplacer()
         self.step_count += 1
 
-        if self.serpent.verifier_collision(self.grille.largeur, self.grille.hauteur):
+        x, y = self.serpent.tete
+
+        # Collision avec les murs
+        if x < 0 or x >= self.grille.largeur or y < 0 or y >= self.grille.hauteur:
             self.game_over = True
+            self.cause_mort = "mur"
             return
 
+        # Collision avec le corps
+        if self.serpent.tete in self.serpent.corps[1:]:
+            self.game_over = True
+            self.cause_mort = "corps"
+            return
+
+        # Collision avec un obstacle
         if self.serpent.tete in self.grille.obstacles:
             self.game_over = True
+            self.cause_mort = "obstacle"
             return
 
         if self.grille.nourriture and self.serpent.tete == self.grille.nourriture:
@@ -145,6 +159,7 @@ class MoteurJeu:
             self.grille.generer_nourriture(forbidden=self._forbidden_cells() | self.grille.obstacles)
             if self.grille.nourriture is None:
                 self.game_over = True
+                self.cause_mort = "victoire"
                 return
 
         self._update_dynamic_obstacles()
@@ -176,6 +191,10 @@ class MoteurJeu:
             ],
             "score": state.score,
             "game_over": state.game_over,
+            "cause_mort": self.cause_mort,
+            "longueur_serpent": len(self.serpent.corps),
+            "taille_grille": f"{self.grille.largeur}x{self.grille.hauteur}",
+            "obstacles_actifs": len(self.grille.obstacles) > 0,
             "mode": state.mode,
             "step_count": state.step_count,
             "direction": state.direction,

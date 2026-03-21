@@ -91,7 +91,7 @@ function ControlPanel() {
             onClick={handleStart}
             className="flex-1 px-3 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-sm text-slate-950 font-semibold border border-emerald-300"
           >
-            {started ? "Reprendre" : "Start"}
+            {!started ? "Start" : paused ? "Reprendre" : "Redémarrer"}
           </button>
           <button
             onClick={handleReset}

@@ -15,10 +15,10 @@ function useKeyboard(enabled = true) {
     const onKeyDown = (e) => {
       if (mode !== "manual") return;
       let dir = null;
-      if (e.key === "ArrowUp") dir = "UP";
-      if (e.key === "ArrowDown") dir = "DOWN";
-      if (e.key === "ArrowLeft") dir = "LEFT";
-      if (e.key === "ArrowRight") dir = "RIGHT";
+      if (e.key === "ArrowUp" || e.key === "z" || e.key === "Z") dir = "UP";
+      if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") dir = "DOWN";
+      if (e.key === "ArrowLeft" || e.key === "q" || e.key === "Q") dir = "LEFT";
+      if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") dir = "RIGHT";
       if (dir) {
         e.preventDefault();
         wsService.send("direction", { dir });

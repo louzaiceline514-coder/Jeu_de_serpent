@@ -5,6 +5,8 @@ from __future__ import annotations
 import random
 from typing import List, Optional, Set, Tuple
 
+import numpy as np
+
 from .direction import Direction
 
 Coord = Tuple[int, int]
@@ -71,4 +73,32 @@ class Grille:
             if self.est_dans_grille(nx, ny):
                 voisins.append((nx, ny))
         return voisins
+
+    def to_numpy_grid(self, corps: List[Coord]) -> np.ndarray:
+        """Retourne une représentation NumPy uint8 de la grille.
+
+        Valeurs des cellules :
+          0 = vide
+          1 = corps du serpent (tête comprise)
+          2 = nourriture
+          3 = obstacle
+        La matrice est indexée [ligne=y, colonne=x] (convention NumPy standard).
+        Une grille 20×20 n'occupe que 400 octets en uint8.
+        """
+        grid: np.ndarray = np.zeros((self.hauteur, self.largeur), dtype=np.uint8)
+
+        for x, y in self.obstacles:
+            if 0 <= y < self.hauteur and 0 <= x < self.largeur:
+                grid[y, x] = 3
+
+        if self.nourriture is not None:
+            fx, fy = self.nourriture
+            if 0 <= fy < self.hauteur and 0 <= fx < self.largeur:
+                grid[fy, fx] = 2
+
+        for x, y in corps:
+            if 0 <= y < self.hauteur and 0 <= x < self.largeur:
+                grid[y, x] = 1
+
+        return grid
 

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import orjson
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import ORJSONResponse
 
 # IMPORTANT :
 # Ce projet doit pouvoir être lancé depuis le dossier `backend` avec :
@@ -19,9 +21,9 @@ from routes.agent_routes import router as agent_router
 from websocket_handler import GameWebSocketManager
 
 # Création des tables en base de données au démarrage
-Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine, checkfirst=True)
 
-app = FastAPI(title="Snake AI Backend", version="1.0.0")
+app = FastAPI(title="Snake AI Backend", version="1.0.0", default_response_class=ORJSONResponse)
 
 # Configuration CORS
 app.add_middleware(

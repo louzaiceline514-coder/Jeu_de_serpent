@@ -94,34 +94,41 @@ class AgentQL(Agent):
         (danger_straight, danger_left, danger_right,
          dir_up, dir_down, dir_left, dir_right,
          food_up, food_down, food_left, food_right)
+
+        Les vérifications de danger utilisent une matrice NumPy uint8 (to_numpy_grid)
+        pour un accès O(1) aux cellules sans parcours de listes Python.
+        Valeurs : 0=vide, 1=corps, 2=nourriture, 3=obstacle.
         """
         tete_x, tete_y = moteur.serpent.tete
         dir_actuelle = moteur.serpent.direction
         food = moteur.grille.nourriture
+        corps = list(moteur.serpent.corps)
+
+        # Grille NumPy uint8 — indexée [y, x]
+        grid = moteur.grille.to_numpy_grid(corps)
+        h, w = grid.shape
 
         def danger_si_direction(direction: Direction) -> int:
             nx, ny = tete_x + direction.dx, tete_y + direction.dy
-            if not moteur.grille.est_dans_grille(nx, ny):
+            if nx < 0 or nx >= w or ny < 0 or ny >= h:
                 return 1
-            if (nx, ny) in moteur.grille.obstacles:
-                return 1
-            if (nx, ny) in list(moteur.serpent.corps)[1:]:
-                return 1
-            return 0
+            cell = int(grid[ny, nx])
+            # 1 = corps, 3 = obstacle → danger ; 0 = vide, 2 = nourriture → sûr
+            return 1 if cell == 1 or cell == 3 else 0
 
         # Orientation relative : avant/gauche/droite par rapport à la direction actuelle
         if dir_actuelle == Direction.HAUT:
-            dir_straight, dir_left, dir_right = Direction.HAUT, Direction.GAUCHE, Direction.DROITE
+            move_straight, move_left, move_right = Direction.HAUT, Direction.GAUCHE, Direction.DROITE
         elif dir_actuelle == Direction.BAS:
-            dir_straight, dir_left, dir_right = Direction.BAS, Direction.DROITE, Direction.GAUCHE
+            move_straight, move_left, move_right = Direction.BAS, Direction.DROITE, Direction.GAUCHE
         elif dir_actuelle == Direction.GAUCHE:
-            dir_straight, dir_left, dir_right = Direction.GAUCHE, Direction.BAS, Direction.HAUT
+            move_straight, move_left, move_right = Direction.GAUCHE, Direction.BAS, Direction.HAUT
         else:
-            dir_straight, dir_left, dir_right = Direction.DROITE, Direction.HAUT, Direction.BAS
+            move_straight, move_left, move_right = Direction.DROITE, Direction.HAUT, Direction.BAS
 
-        danger_straight = danger_si_direction(dir_straight)
-        danger_left = danger_si_direction(dir_left)
-        danger_right = danger_si_direction(dir_right)
+        danger_straight = danger_si_direction(move_straight)
+        danger_left = danger_si_direction(move_left)
+        danger_right = danger_si_direction(move_right)
 
         dir_up = 1 if dir_actuelle == Direction.HAUT else 0
         dir_down = 1 if dir_actuelle == Direction.BAS else 0

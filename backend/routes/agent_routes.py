@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
+import time
+from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -21,6 +22,19 @@ class AgentStepRequest(BaseModel):
 
     agent_type: str
     game_state: dict[str, Any]
+
+
+class SaveGameRequest(BaseModel):
+    """Payload pour enregistrer une partie BattleArena en base de données."""
+
+    agent_type: str          # "astar" | "rl"
+    score: int
+    nb_steps: int
+    duration: float
+    cause_mort: str = "inconnu"
+    taille_grille: str = "20x20"
+    obstacles_actifs: bool = True
+    longueur_serpent: int = 1
 
 
 class AgentInitRequest(BaseModel):
@@ -82,12 +96,36 @@ def _restore_engine(state: dict[str, Any]) -> MoteurJeu:
     return moteur
 
 
+# Singletons : évite de recharger la Q-table depuis le disque à chaque tick
+_astar_singleton: Optional[AgentAStar] = None
+_rl_singleton: Optional[AgentQL] = None
+
+
 def _select_agent(agent_type: str) -> Any:
+    global _astar_singleton, _rl_singleton
     if agent_type == "astar":
-        return AgentAStar()
+        if _astar_singleton is None:
+            _astar_singleton = AgentAStar()
+        return _astar_singleton
     if agent_type == "rl":
-        return AgentQL(epsilon=EPSILON_MIN)
+        if _rl_singleton is None:
+            _rl_singleton = AgentQL(epsilon=EPSILON_MIN)
+        return _rl_singleton
     raise HTTPException(status_code=400, detail=f"Agent type non supporte: {agent_type}")
+
+
+def _compute_safety_score(moteur: MoteurJeu) -> float:
+    """Proportion de cases adjacentes à la tête qui sont sûres (0.0 – 1.0)."""
+    tete_x, tete_y = moteur.serpent.tete
+    corps_set = set(list(moteur.serpent.corps)[1:])
+    safe = sum(
+        1
+        for d in Direction
+        if moteur.grille.est_dans_grille(tete_x + d.dx, tete_y + d.dy)
+        and (tete_x + d.dx, tete_y + d.dy) not in moteur.grille.obstacles
+        and (tete_x + d.dx, tete_y + d.dy) not in corps_set
+    )
+    return safe / 4.0
 
 
 @router.post("/init")
@@ -103,16 +141,114 @@ def init_agent_game(request: AgentInitRequest) -> dict:
 
 @router.post("/step")
 def agent_step(request: AgentStepRequest) -> dict:
-    """Fait avancer un agent d'un tick et retourne le nouvel etat."""
+    """Fait avancer un agent d'un tick et retourne le nouvel etat + métriques."""
 
     moteur = _restore_engine(request.game_state)
     agent = _select_agent(request.agent_type)
 
+    inference_ms = 0.0
     if not moteur.game_over:
+        t0 = time.perf_counter()
         direction = agent.choisir_action({"engine": moteur})
+        inference_ms = (time.perf_counter() - t0) * 1000.0
         moteur.changer_direction(direction)
         moteur.step()
 
+    safety = _compute_safety_score(moteur)
+    if safety >= 0.75:
+        analysis = "Zone sûre"
+    elif safety >= 0.5:
+        analysis = "Zone serrée"
+    else:
+        analysis = "Danger élevé"
+
+    epsilon = float(agent.epsilon) if hasattr(agent, "epsilon") else None
+
     return {
         "payload": moteur.get_state_dict(),
+        "meta": {
+            "inference_ms": round(inference_ms, 3),
+            "safety_score": round(safety, 3),
+            "epsilon": epsilon,
+            "analysis": analysis,
+        },
     }
+
+
+def reset_rl_singleton() -> None:
+    """Force le rechargement de la Q-table au prochain appel /api/agent/step.
+
+    À appeler après un entraînement pour que la BattleArena utilise le modèle mis à jour.
+    """
+    global _rl_singleton
+    _rl_singleton = None
+
+
+@router.post("/save_game")
+def save_agent_game(request: SaveGameRequest) -> dict:
+    """Enregistre une partie BattleArena en base de données (stats + historique)."""
+    from datetime import datetime
+
+    from database import SessionLocal
+    from models.agent import Agent as AgentModel
+    from models.game import Game
+    from models.stats import AgentStats
+
+    name_map = {"astar": "A*", "rl": "Q-Learning"}
+    name = name_map.get(request.agent_type, request.agent_type)
+
+    db = SessionLocal()
+    try:
+        agent = db.query(AgentModel).filter(AgentModel.type == request.agent_type).first()
+        if agent is None:
+            agent = AgentModel(name=name, type=request.agent_type)
+            db.add(agent)
+            db.commit()
+            db.refresh(agent)
+
+        game = Game(
+            agent_id=agent.id,
+            score=request.score,
+            nb_steps=request.nb_steps,
+            duration=request.duration,
+            longueur_serpent=request.longueur_serpent,
+            cause_mort=request.cause_mort,
+            taille_grille=request.taille_grille,
+            obstacles_actifs=request.obstacles_actifs,
+            date_fin=datetime.utcnow(),
+        )
+        db.add(game)
+
+        stats = db.query(AgentStats).filter(AgentStats.agent_id == agent.id).first()
+        if stats is None:
+            stats = AgentStats(
+                agent_id=agent.id,
+                games_played=0,
+                avg_score=0.0,
+                best_score=0,
+                win_rate=0.0,
+            )
+            db.add(stats)
+
+        if stats.games_played is None:
+            stats.games_played = 0
+        if stats.avg_score is None:
+            stats.avg_score = 0.0
+        if stats.best_score is None:
+            stats.best_score = 0
+        if stats.win_rate is None:
+            stats.win_rate = 0.0
+
+        old_games = stats.games_played
+        stats.games_played += 1
+        stats.best_score = max(stats.best_score, request.score)
+        stats.avg_score = (stats.avg_score * old_games + request.score) / stats.games_played
+        wins = stats.win_rate * old_games
+        if request.score > 0:
+            wins += 1
+        stats.win_rate = wins / stats.games_played
+
+        db.commit()
+        return {"status": "saved"}
+    finally:
+        db.close()

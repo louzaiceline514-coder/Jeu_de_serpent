@@ -53,12 +53,3 @@ class Serpent:
         """Indique que le serpent doit grandir au prochain déplacement."""
         self._doit_grandir = True
 
-    def verifier_collision(self, largeur: int, hauteur: int) -> bool:
-        """Vérifie les collisions avec les murs ou le corps."""
-        x, y = self.tete
-        if x < 0 or x >= largeur or y < 0 or y >= hauteur:
-            return True
-        # Collision avec le reste du corps
-        if self.tete in self.corps[1:]:
-            return True
-        return False

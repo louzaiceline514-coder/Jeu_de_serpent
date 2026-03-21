@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import GameGrid from "./components/GameGrid";
 import ControlPanel from "./components/ControlPanel";
 import Dashboard from "./components/Dashboard";
@@ -12,8 +12,14 @@ import useKeyboard from "./hooks/useKeyboard";
 function App() {
   const [hasEntered, setHasEntered] = useState(false);
   const [view, setView] = useState("game"); // "game" | "battle" | "stats" | "training"
+  const audioRef = useRef(null);
   useWebSocket(hasEntered);
   useKeyboard(hasEntered);
+
+  const handleEnter = () => {
+    setHasEntered(true);
+    setTimeout(() => audioRef.current?.startMusic(), 100);
+  };
 
   if (!hasEntered) {
     return (
@@ -45,7 +51,7 @@ function App() {
           </div>
 
           <button
-            onClick={() => setHasEntered(true)}
+            onClick={handleEnter}
             className="px-8 py-3 rounded-xl bg-emerald-500 text-slate-950 font-semibold hover:bg-emerald-400 transition-colors"
           >
             Start
@@ -94,7 +100,7 @@ function App() {
               Stats
             </button>
           </nav>
-          <AmbientAudioControls />
+          <AmbientAudioControls ref={audioRef} />
         </div>
       </header>
 

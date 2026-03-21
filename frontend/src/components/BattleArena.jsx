@@ -18,7 +18,7 @@ import { api } from "../services/api";
 const GRID_SIZE = 20;
 const CELL_SIZE = 20;
 const TICK_DELAY_MS = 140;
-const MAX_STEPS = 350;
+const MAX_STEPS = 1000;
 
 const createInitialGameState = () => ({
   snake: [{ x: 10, y: 10 }],
@@ -421,6 +421,20 @@ function BattleArena() {
       }
 
       if (!loopCancelledRef.current) {
+        // Enregistre les deux parties en base pour alimenter la page Stats
+        const duration = (steps * TICK_DELAY_MS) / 1000;
+        const savePayload = (agentType, gameState) => ({
+          agent_type: agentType,
+          score: gameState.score,
+          nb_steps: gameState.step_count,
+          duration,
+          cause_mort: gameState.game_over ? "battle" : "timeout",
+          obstacles_actifs: gameState.obstacles.length > 0,
+          longueur_serpent: gameState.snake.length,
+        });
+        api.post("/api/agent/save_game", savePayload("astar", nextAstarState)).catch(() => {});
+        api.post("/api/agent/save_game", savePayload("rl", nextRlState)).catch(() => {});
+
         setBattleHistory((history) => [
           ...history,
           {
