@@ -273,7 +273,11 @@ function App() {
   const cycleTheme = () => setThemeIdx((i) => (i + 1) % THEMES.length);
 
   if (!hasEntered) {
-    return <WelcomeScreen onEnter={handleEnter} />;
+    return (
+      <div style={{ filter: "hue-rotate(200deg)" }}>
+        <WelcomeScreen onEnter={handleEnter} />
+      </div>
+    );
   }
 
   const theme = THEMES[themeIdx];
@@ -283,36 +287,35 @@ function App() {
       className="min-h-screen flex flex-col"
       style={{ filter: theme.filter, transition: "filter 0.4s ease" }}
     >
-      <header className="border-b border-slate-800 px-6 py-3 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between bg-slate-900/80 backdrop-blur sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold text-slate-50">Snake AI – SAE4</h1>
-          {/* WS status */}
-          <span className="flex items-center gap-1.5 text-xs">
-            <span
-              className={`w-2 h-2 rounded-full pulse-dot ${
-                connected ? "bg-emerald-400 text-emerald-400" : "bg-red-400 text-red-400"
-              }`}
-            />
-            <span className={connected ? "text-emerald-400" : "text-red-400"}>
-              {connected ? "Backend OK" : "Déconnecté"}
+      <header className="border-b border-slate-800 px-6 py-3 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div className="flex items-center justify-between">
+          {/* Gauche : titre + statuts */}
+          <div className="flex items-center gap-3 min-w-[180px]">
+            <h1 className="text-lg font-semibold text-slate-50">Snake AI – SAE4</h1>
+            <span className="flex items-center gap-1.5 text-xs">
+              <span
+                className={`w-2 h-2 rounded-full pulse-dot ${
+                  connected ? "bg-emerald-400 text-emerald-400" : "bg-red-400 text-red-400"
+                }`}
+              />
+              <span className={connected ? "text-emerald-400" : "text-red-400"}>
+                {connected ? "OK" : "Off"}
+              </span>
             </span>
-          </span>
-          {/* Score live */}
-          {hasEntered && (
-            <span className="bg-slate-800 border border-slate-700 rounded-full px-2.5 py-0.5 text-xs text-emerald-400 font-semibold">
-              Score : {score}
-            </span>
-          )}
-        </div>
+            {hasEntered && (
+              <span className="bg-slate-800 border border-slate-700 rounded-full px-2.5 py-0.5 text-xs text-emerald-400 font-semibold">
+                {score} pts
+              </span>
+            )}
+          </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Navigation */}
+          {/* Centre : navigation */}
           <nav className="flex gap-1.5">
             {[
-              { key: "game",     label: "Jeu",          color: "emerald" },
+              { key: "game",     label: "Jouer",        color: "emerald" },
               { key: "battle",   label: "A* vs QL",     color: "purple"  },
               { key: "training", label: "Entraînement", color: "emerald" },
-              { key: "stats",    label: "Stats",        color: "emerald" },
+              { key: "stats",    label: "Performances", color: "emerald" },
             ].map((v) => (
               <button
                 key={v.key}
@@ -330,7 +333,10 @@ function App() {
             ))}
           </nav>
 
-          <AmbientAudioControls ref={audioRef} />
+          {/* Droite : audio */}
+          <div className="flex items-center min-w-[180px] justify-end">
+            <AmbientAudioControls ref={audioRef} />
+          </div>
         </div>
       </header>
 
