@@ -33,7 +33,7 @@ jobs:
           python -m pytest tests/ -v --tb=short
 
   test-frontend:
-    name: Tests JavaScript (Jest)
+    name: Tests JavaScript (Vitest)
     runs-on: ubuntu-latest
 
     steps:
@@ -51,6 +51,6 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Lancement des tests Jest
+      - name: Lancement des tests Vitest
         working-directory: frontend
-        run: npm test -- --watchAll=false --passWithNoTests
+        run: npm test
