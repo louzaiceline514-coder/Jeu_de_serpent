@@ -25,6 +25,7 @@ export const fetchTrainingResults = createAsyncThunk(
 );
 
 const initialState = {
+  manual: { avg_score: 0, best_score: 0, games_played: 0, win_rate: 0, avg_steps: 0, avg_duration: 0 },
   astar: { avg_score: 0, best_score: 0, games_played: 0, win_rate: 0 },
   rl: { avg_score: 0, best_score: 0, games_played: 0, win_rate: 0 },
   history: [],
@@ -46,6 +47,7 @@ const statsSlice = createSlice({
       })
       .addCase(fetchComparison.fulfilled, (state, action) => {
         state.loading = false;
+        state.manual = action.payload.manual || state.manual;
         state.astar = action.payload.astar || state.astar;
         state.rl = action.payload.rl || state.rl;
       })

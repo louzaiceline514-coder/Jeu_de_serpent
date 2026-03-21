@@ -1,11 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
 
+const LEAD_NOTES = [523.25, 659.25, 783.99, 659.25, 880, 783.99, 659.25, 587.33];
+const BASS_NOTES = [130.81, 146.83, 164.81, 196, 164.81, 146.83, 130.81, 98];
+
 function AmbientAudioControls() {
   const audioContextRef = useRef(null);
   const masterGainRef = useRef(null);
   const musicNodesRef = useRef([]);
+  const loopTimerRef = useRef(null);
+  const stepIndexRef = useRef(0);
   const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(35);
+  const [volume, setVolume] = useState(42);
 
   useEffect(() => {
     return () => {
@@ -17,6 +22,11 @@ function AmbientAudioControls() {
   }, []);
 
   const stopMusic = () => {
+    if (loopTimerRef.current) {
+      window.clearInterval(loopTimerRef.current);
+      loopTimerRef.current = null;
+    }
+
     musicNodesRef.current.forEach((node) => {
       try {
         node.stop();
@@ -37,9 +47,37 @@ function AmbientAudioControls() {
       masterGainRef.current.gain.setTargetAtTime(
         muted ? 0 : nextVolume / 100,
         audioContextRef.current.currentTime,
-        0.15
+        0.12
       );
     }
+  };
+
+  const schedulePulse = (frequency, type, gainAmount, duration, detune = 0, filterType = "lowpass") => {
+    const ctx = audioContextRef.current;
+    const now = ctx.currentTime;
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    oscillator.type = type;
+    oscillator.frequency.value = frequency;
+    oscillator.detune.value = detune;
+
+    filter.type = filterType;
+    filter.frequency.value = type === "square" ? 1450 : 920;
+    filter.Q.value = 1.4;
+
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(gainAmount, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+    oscillator.connect(filter);
+    filter.connect(gain);
+    gain.connect(masterGainRef.current);
+
+    oscillator.start(now);
+    oscillator.stop(now + duration + 0.05);
+    musicNodesRef.current.push(oscillator, gain, filter);
   };
 
   const ensureMusic = async () => {
@@ -58,40 +96,27 @@ function AmbientAudioControls() {
       await audioContextRef.current.resume();
     }
 
-    if (musicNodesRef.current.length > 0) {
+    if (loopTimerRef.current) {
       applyVolume(volume);
       return;
     }
 
-    const now = audioContextRef.current.currentTime;
-    const masterGain = masterGainRef.current;
+    stepIndexRef.current = 0;
+    loopTimerRef.current = window.setInterval(() => {
+      const step = stepIndexRef.current % LEAD_NOTES.length;
+      const lead = LEAD_NOTES[step];
+      const bass = BASS_NOTES[step];
 
-    const createPad = (frequency, type, detune, level) => {
-      const oscillator = audioContextRef.current.createOscillator();
-      const gain = audioContextRef.current.createGain();
-      const filter = audioContextRef.current.createBiquadFilter();
+      schedulePulse(lead, "square", 0.024, 0.18, step % 2 === 0 ? 2 : -3, "bandpass");
+      schedulePulse(lead / 2, "triangle", 0.012, 0.26, -5);
+      schedulePulse(bass, "sawtooth", 0.016, 0.24, 0, "lowpass");
 
-      oscillator.type = type;
-      oscillator.frequency.value = frequency;
-      oscillator.detune.value = detune;
+      if (step % 2 === 0) {
+        schedulePulse(lead * 1.5, "triangle", 0.006, 0.12, 1, "highpass");
+      }
 
-      filter.type = "lowpass";
-      filter.frequency.value = 540;
-      filter.Q.value = 0.8;
-
-      gain.gain.value = level;
-
-      oscillator.connect(filter);
-      filter.connect(gain);
-      gain.connect(masterGain);
-      oscillator.start(now);
-
-      musicNodesRef.current.push(oscillator, gain, filter);
-    };
-
-    createPad(220, "sine", -4, 0.018);
-    createPad(261.63, "triangle", 2, 0.012);
-    createPad(329.63, "sine", 1, 0.01);
+      stepIndexRef.current += 1;
+    }, 220);
 
     applyVolume(volume);
   };
@@ -115,24 +140,24 @@ function AmbientAudioControls() {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="text-slate-400">Ambiance</span>
+    <div className="flex flex-wrap items-center gap-2 rounded-full border border-slate-800 bg-slate-950/80 px-3 py-2 text-xs">
+      <span className="uppercase tracking-[0.25em] text-slate-500">Arcade Audio</span>
       <button
-        onClick={() => updateVolume(volume - 10)}
-        className="px-2 py-1 rounded bg-slate-800 text-slate-200 border border-slate-700"
+        onClick={() => updateVolume(volume - 8)}
+        className="rounded-full border border-slate-700 bg-slate-900 px-2 py-1 text-slate-200"
       >
         -
       </button>
       <span className="min-w-14 text-center text-slate-200">{isMuted ? "Mute" : `${volume}%`}</span>
       <button
-        onClick={() => updateVolume(volume + 10)}
-        className="px-2 py-1 rounded bg-slate-800 text-slate-200 border border-slate-700"
+        onClick={() => updateVolume(volume + 8)}
+        className="rounded-full border border-slate-700 bg-slate-900 px-2 py-1 text-slate-200"
       >
         +
       </button>
       <button
         onClick={toggleMute}
-        className="px-3 py-1 rounded bg-amber-500 text-slate-950 font-medium"
+        className="rounded-full bg-gradient-to-r from-amber-400 to-emerald-400 px-3 py-1 font-medium text-slate-950"
       >
         {isMuted ? "Activer" : "Couper"}
       </button>

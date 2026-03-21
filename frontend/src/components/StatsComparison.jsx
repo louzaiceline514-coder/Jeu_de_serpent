@@ -1,24 +1,36 @@
 import React, { useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  LineChart,
-  Line,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  BarChart,
   Bar,
-  ResponsiveContainer
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
 } from "recharts";
 import { fetchComparison, fetchHistory } from "../store/statsSlice";
 
-// Composant d'affichage des statistiques comparatives A* vs RL.
+const AGENT_META = {
+  manual: { label: "Manuel", color: "#f97316" },
+  astar: { label: "A*", color: "#10b981" },
+  rl: { label: "Q-Learning", color: "#38bdf8" }
+};
+
+function formatDuration(seconds) {
+  return `${Number(seconds ?? 0).toFixed(2)} s`;
+}
+
+function formatScore(value) {
+  return Number(value ?? 0).toFixed(2);
+}
 
 function StatsComparison() {
   const dispatch = useDispatch();
-  const { astar, rl, history } = useSelector((state) => state.stats);
+  const { manual, astar, rl, history } = useSelector((state) => state.stats);
   const lastMessage = useSelector((state) => state.ws.lastMessage);
 
   useEffect(() => {
@@ -38,146 +50,214 @@ function StatsComparison() {
       const timeoutId = window.setTimeout(() => {
         dispatch(fetchComparison());
         dispatch(fetchHistory());
-      }, 300);
+      }, 250);
 
       return () => window.clearTimeout(timeoutId);
     }
     return undefined;
   }, [dispatch, lastMessage]);
 
+  const agents = [
+    { key: "manual", stats: manual },
+    { key: "astar", stats: astar },
+    { key: "rl", stats: rl }
+  ];
+
   const handleExportCSV = () => {
     const rows = [
-      ["agent_type", "score", "nb_steps", "duration", "created_at"],
-      ...history.map((h) => [h.agent_type, h.score, h.nb_steps, h.duration, h.created_at])
+      ["agent_type", "agent_name", "score", "nb_steps", "duration", "created_at"],
+      ...history.map((entry) => [
+        entry.agent_type,
+        entry.agent_name,
+        entry.score,
+        entry.nb_steps,
+        entry.duration,
+        entry.created_at
+      ])
     ];
-    const csv = rows.map((r) => r.join(",")).join("\n");
+    const csv = rows.map((row) => row.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "snake_ai_stats.csv";
-    a.click();
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "snake_parties_reelles.csv";
+    anchor.click();
     URL.revokeObjectURL(url);
   };
 
   const lineData = useMemo(() => {
-    const astarHistory = history.filter((entry) => entry.agent_type === "astar").slice(-20);
-    const rlHistory = history.filter((entry) => entry.agent_type === "rl").slice(-20);
-    const maxLength = Math.max(astarHistory.length, rlHistory.length);
+    const recentByAgent = Object.keys(AGENT_META).reduce((accumulator, key) => {
+      accumulator[key] = history.filter((entry) => entry.agent_type === key).slice(-12);
+      return accumulator;
+    }, {});
+
+    const maxLength = Math.max(...Object.values(recentByAgent).map((entries) => entries.length), 0);
 
     return Array.from({ length: maxLength }, (_, index) => ({
       game: index + 1,
-      astar: astarHistory[index]?.score ?? null,
-      rl: rlHistory[index]?.score ?? null
+      manual: recentByAgent.manual[index]?.score ?? null,
+      astar: recentByAgent.astar[index]?.score ?? null,
+      rl: recentByAgent.rl[index]?.score ?? null
     }));
   }, [history]);
 
-  const barData = [
-    {
-      name: "A*",
-      avg: astar.avg_score,
-      best: astar.best_score,
-      winRate: Number((astar.win_rate * 100).toFixed(1))
-    },
-    {
-      name: "RL",
-      avg: rl.avg_score,
-      best: rl.best_score,
-      winRate: Number((rl.win_rate * 100).toFixed(1))
-    }
-  ];
+  const summaryData = agents.map(({ key, stats }) => ({
+    name: AGENT_META[key].label,
+    avg: Number((stats.avg_score ?? 0).toFixed(2)),
+    best: stats.best_score ?? 0,
+    survival: Number(((stats.win_rate ?? 0) * 100).toFixed(1))
+  }));
+
+  const recentGames = useMemo(() => history.slice(-12).reverse(), [history]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-slate-200">
-          Comparaison des performances A* vs Q-Learning
-        </h2>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-white">Statistiques réelles des parties</h2>
+          <p className="mt-1 max-w-3xl text-sm text-slate-300">
+            Cette vue regroupe désormais les données du manuel, de A* et de Q-Learning à
+            partir des parties réellement jouées et enregistrées.
+          </p>
+        </div>
         <button
           onClick={handleExportCSV}
-          className="px-3 py-1 rounded bg-slate-800 border border-slate-700 text-xs text-slate-100"
+          className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-100"
         >
-          Export CSV
+          Exporter les parties
         </button>
       </div>
 
-      <p className="text-xs text-slate-400">
-        Ces statistiques sont calculees a partir des parties réellement enregistrees en base pour A*
-        et Q-Learning. La vue se rafraichit automatiquement pendant que des parties se terminent.
-      </p>
-
-      <div className="grid grid-cols-1 gap-4 text-xs">
-        <div className="bg-slate-900/80 rounded-lg p-3 space-y-2">
-          <p className="text-slate-400">Tableau comparatif</p>
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="text-slate-400">
-                <th className="border-b border-slate-700 py-1">Agent</th>
-                <th className="border-b border-slate-700 py-1">Score moyen</th>
-                <th className="border-b border-slate-700 py-1">Meilleur score</th>
-                <th className="border-b border-slate-700 py-1">Parties</th>
-                <th className="border-b border-slate-700 py-1">Taux survie</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="py-1">A*</td>
-                <td>{astar.avg_score.toFixed(2)}</td>
-                <td>{astar.best_score}</td>
-                <td>{astar.games_played}</td>
-                <td>{(astar.win_rate * 100).toFixed(1)}%</td>
-              </tr>
-              <tr>
-                <td className="py-1">Q-Learning</td>
-                <td>{rl.avg_score.toFixed(2)}</td>
-                <td>{rl.best_score}</td>
-                <td>{rl.games_played}</td>
-                <td>{(rl.win_rate * 100).toFixed(1)}%</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <div className="grid gap-4 xl:grid-cols-3">
+        {agents.map(({ key, stats }) => (
+          <AgentCard key={key} agentKey={key} stats={stats} />
+        ))}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="bg-slate-900/80 rounded-lg p-3 h-80 overflow-hidden">
-          <p className="text-xs text-slate-400 mb-1">
-            Évolution du score sur les dernières parties
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(340px,1fr)]">
+        <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5">
+          <p className="text-sm font-medium text-slate-100">Évolution des derniers scores</p>
+          <p className="mb-4 mt-1 text-xs text-slate-400">
+            Les courbes représentent les vraies parties des trois modes, et non plus un benchmark
+            isolé.
           </p>
-          <div className="h-64">
+          <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={lineData}>
                 <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
-                <XAxis dataKey="game" stroke="#64748b" />
-                <YAxis stroke="#64748b" />
+                <XAxis dataKey="game" stroke="#94a3b8" />
+                <YAxis stroke="#94a3b8" />
                 <Tooltip />
                 <Legend />
-                <Line type="monotone" dataKey="astar" stroke="#22c55e" dot={false} />
-                <Line type="monotone" dataKey="rl" stroke="#38bdf8" dot={false} />
+                <Line type="monotone" dataKey="manual" stroke={AGENT_META.manual.color} dot={false} name="Manuel" />
+                <Line type="monotone" dataKey="astar" stroke={AGENT_META.astar.color} dot={false} name="A*" />
+                <Line type="monotone" dataKey="rl" stroke={AGENT_META.rl.color} dot={false} name="Q-Learning" />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
-        <div className="bg-slate-900/80 rounded-lg p-3 h-80 overflow-hidden">
-          <p className="text-xs text-slate-400 mb-1">
-            Comparaison score moyen / meilleur / taux de survie
+
+        <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5">
+          <p className="text-sm font-medium text-slate-100">Synthèse comparative</p>
+          <p className="mb-4 mt-1 text-xs text-slate-400">
+            Score moyen, meilleur score et taux de survie calculés sur les parties jouées.
           </p>
-          <div className="h-64">
+          <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barData}>
+              <BarChart data={summaryData}>
                 <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
-                <XAxis dataKey="name" stroke="#64748b" />
-                <YAxis stroke="#64748b" />
+                <XAxis dataKey="name" stroke="#94a3b8" />
+                <YAxis stroke="#94a3b8" />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="avg" fill="#22c55e" name="Score moyen" />
-                <Bar dataKey="best" fill="#a855f7" name="Meilleur score" />
-                <Bar dataKey="winRate" fill="#38bdf8" name="Taux de survie (%)" />
+                <Bar dataKey="avg" fill="#f97316" name="Score moyen" />
+                <Bar dataKey="best" fill="#10b981" name="Meilleur score" />
+                <Bar dataKey="survival" fill="#38bdf8" name="Taux de survie (%)" />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
       </div>
+
+      <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-100">Dernières parties</p>
+            <p className="mt-1 text-xs text-slate-400">
+              Historique brut des parties réellement terminées depuis l&apos;interface de jeu ou le duel.
+            </p>
+          </div>
+          <span className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300">
+            {history.length} parties
+          </span>
+        </div>
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-full text-left text-sm text-slate-200">
+            <thead className="border-b border-slate-800 text-xs uppercase tracking-[0.2em] text-slate-500">
+              <tr>
+                <th className="pb-3 pr-4">Mode</th>
+                <th className="pb-3 pr-4">Score</th>
+                <th className="pb-3 pr-4">Steps</th>
+                <th className="pb-3 pr-4">Durée</th>
+                <th className="pb-3 pr-4">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentGames.map((entry) => (
+                <tr key={`${entry.agent_type}-${entry.created_at}-${entry.score}`} className="border-b border-slate-900">
+                  <td className="py-3 pr-4">{AGENT_META[entry.agent_type]?.label ?? entry.agent_name}</td>
+                  <td className="py-3 pr-4">{entry.score}</td>
+                  <td className="py-3 pr-4">{entry.nb_steps}</td>
+                  <td className="py-3 pr-4">{formatDuration(entry.duration)}</td>
+                  <td className="py-3 pr-4">{new Date(entry.created_at).toLocaleString("fr-FR")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AgentCard({ agentKey, stats }) {
+  const meta = AGENT_META[agentKey];
+
+  return (
+    <article className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5 shadow-[0_18px_60px_rgba(2,6,23,0.35)]">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Mode</p>
+          <h3 className="mt-2 text-2xl font-semibold text-white">{meta.label}</h3>
+        </div>
+        <span
+          className="h-12 w-12 rounded-2xl border"
+          style={{ borderColor: `${meta.color}55`, backgroundColor: `${meta.color}22` }}
+        />
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+        <Metric label="Parties" value={stats.games_played ?? 0} accent={meta.color} />
+        <Metric label="Dernier score" value={stats.last_score ?? 0} accent={meta.color} />
+        <Metric label="Score moyen" value={formatScore(stats.avg_score)} accent={meta.color} />
+        <Metric label="Moyenne récente" value={formatScore(stats.recent_avg_score)} accent={meta.color} />
+        <Metric label="Meilleur score" value={stats.best_score ?? 0} accent={meta.color} />
+        <Metric label="Survie" value={`${((stats.win_rate ?? 0) * 100).toFixed(1)}%`} accent={meta.color} />
+        <Metric label="Steps moyens" value={formatScore(stats.avg_steps)} accent={meta.color} />
+        <Metric label="Durée moyenne" value={formatDuration(stats.avg_duration)} accent={meta.color} />
+      </div>
+    </article>
+  );
+}
+
+function Metric({ label, value, accent }) {
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-3">
+      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-2 text-lg font-semibold" style={{ color: accent }}>
+        {value}
+      </p>
     </div>
   );
 }

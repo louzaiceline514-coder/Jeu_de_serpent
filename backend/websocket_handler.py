@@ -53,6 +53,8 @@ class GameWebSocketManager:
         )
         for task in pending:
             task.cancel()
+        if self._should_persist_current_game():
+            self._enregistrer_partie()
         self._running = False
 
     async def _tick_loop(self, websocket: WebSocket) -> None:
@@ -95,6 +97,7 @@ class GameWebSocketManager:
                 msg_type = data.get("type")
 
                 if msg_type == "set_mode":
+                    self._save_before_leaving_current_game()
                     mode = data.get("mode", "manual")
                     self.engine.reset(mode=mode)
                     self._paused = True
@@ -107,6 +110,7 @@ class GameWebSocketManager:
                 elif msg_type == "start":
                     self._paused = False
                 elif msg_type == "reset":
+                    self._save_before_leaving_current_game()
                     self.engine.reset(mode=self.engine.mode)
                     self._paused = True
                     self._game_saved = False
@@ -206,5 +210,19 @@ class GameWebSocketManager:
             stats.win_rate = wins / stats.games_played if stats.games_played > 0 else 0.0
 
             db.commit()
+            self._game_saved = True
         finally:
             db.close()
+
+    def _should_persist_current_game(self) -> bool:
+        """Indique si la partie courante merite d'etre enregistree."""
+        return (
+            not self._game_saved
+            and self.engine.step_count > 0
+            and (self.engine.score > 0 or self.engine.mode in {"astar", "rl", "manual"})
+        )
+
+    def _save_before_leaving_current_game(self) -> None:
+        """Sauvegarde une partie en cours avant reset/changement de mode."""
+        if self._should_persist_current_game():
+            self._enregistrer_partie()

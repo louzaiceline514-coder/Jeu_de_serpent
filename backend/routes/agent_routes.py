@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections import deque
+from time import perf_counter
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -10,8 +12,12 @@ from pydantic import BaseModel
 from agents.agent_astar import AgentAStar
 from agents.agent_rl import AgentQL
 from config import EPSILON_MIN
+from database import SessionLocal
 from game_engine.direction import Direction
 from game_engine.moteur import MoteurJeu
+from models.agent import Agent
+from models.game import Game
+from models.stats import AgentStats
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 
@@ -90,6 +96,90 @@ def _select_agent(agent_type: str) -> Any:
     raise HTTPException(status_code=400, detail=f"Agent type non supporte: {agent_type}")
 
 
+def _free_space_ratio(moteur: MoteurJeu) -> float:
+    if moteur.game_over or not moteur.serpent.corps:
+        return 0.0
+
+    head = moteur.serpent.tete
+    blocked = set(moteur.grille.obstacles) | set(moteur.serpent.corps[1:])
+    if head in blocked:
+        return 0.0
+
+    queue = deque([head])
+    visited = {head}
+
+    while queue:
+        x, y = queue.popleft()
+        for nx, ny in moteur.grille.obtenir_voisins(x, y):
+            if (nx, ny) in visited or (nx, ny) in blocked:
+                continue
+            visited.add((nx, ny))
+            queue.append((nx, ny))
+
+    total_cells = moteur.grille.largeur * moteur.grille.hauteur
+    blocked_cells = len(blocked)
+    free_cells = max(1, total_cells - blocked_cells)
+    return min(1.0, len(visited) / free_cells)
+
+
+def _build_analysis(moteur: MoteurJeu, safety_score: float) -> str:
+    if moteur.game_over:
+        return "Partie terminee apres une collision ou un blocage."
+    if moteur.grille.nourriture is None:
+        return "Aucune nourriture disponible, la grille est presque saturee."
+    if safety_score >= 0.7:
+        return "Zone de jeu ouverte et trajectoire stable."
+    if safety_score >= 0.4:
+        return "Trajectoire correcte mais la marge de manoeuvre se reduit."
+    return "Espace libre faible, risque de piege eleve."
+
+
+def _save_agent_game(agent_type: str, score: int, nb_steps: int, duration: float) -> None:
+    db = SessionLocal()
+    try:
+        name = "A*" if agent_type == "astar" else "Q-Learning"
+        agent = db.query(Agent).filter(Agent.type == agent_type).first()
+        if agent is None:
+            agent = Agent(name=name, type=agent_type)
+            db.add(agent)
+            db.commit()
+            db.refresh(agent)
+
+        db.add(
+            Game(
+                agent_id=agent.id,
+                score=score,
+                nb_steps=nb_steps,
+                duration=duration,
+            )
+        )
+
+        stats = db.query(AgentStats).filter(AgentStats.agent_id == agent.id).first()
+        if stats is None:
+            stats = AgentStats(
+                agent_id=agent.id,
+                games_played=0,
+                avg_score=0.0,
+                best_score=0,
+                win_rate=0.0,
+            )
+            db.add(stats)
+
+        old_games = stats.games_played or 0
+        old_avg = stats.avg_score or 0.0
+        old_best = stats.best_score or 0
+        old_win_rate = stats.win_rate or 0.0
+        wins = old_win_rate * old_games + (1 if score > 0 else 0)
+
+        stats.games_played = old_games + 1
+        stats.avg_score = (old_avg * old_games + score) / stats.games_played
+        stats.best_score = max(old_best, score)
+        stats.win_rate = wins / stats.games_played
+        db.commit()
+    finally:
+        db.close()
+
+
 @router.post("/init")
 def init_agent_game(request: AgentInitRequest) -> dict:
     """Initialise un etat de jeu cohérent directement depuis le backend."""
@@ -107,12 +197,28 @@ def agent_step(request: AgentStepRequest) -> dict:
 
     moteur = _restore_engine(request.game_state)
     agent = _select_agent(request.agent_type)
+    was_game_over = moteur.game_over
+    started_at = perf_counter()
 
     if not moteur.game_over:
         direction = agent.choisir_action({"engine": moteur})
         moteur.changer_direction(direction)
         moteur.step()
 
+    inference_ms = (perf_counter() - started_at) * 1000
+    safety_score = _free_space_ratio(moteur)
+    analysis = _build_analysis(moteur, safety_score)
+
+    if not was_game_over and moteur.game_over:
+        duration = round(moteur.step_count * 0.14, 3)
+        _save_agent_game(request.agent_type, int(moteur.score), int(moteur.step_count), duration)
+
     return {
         "payload": moteur.get_state_dict(),
+        "meta": {
+            "inference_ms": round(inference_ms, 3),
+            "epsilon": round(getattr(agent, "epsilon", 0.0), 4) if request.agent_type == "rl" else None,
+            "safety_score": round(safety_score, 4),
+            "analysis": analysis,
+        },
     }
