@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 """Lancement des benchmarks pour tester le système."""
 
 import requests
@@ -81,3 +82,6 @@ def run_benchmark():
 
 if __name__ == "__main__":
     run_benchmark()
+
+
+# ajout lydia
