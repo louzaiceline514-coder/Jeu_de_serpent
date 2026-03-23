@@ -1,159 +1,135 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
 
-const CELL_SIZE = 24;
+const CELL_SIZE_MANUAL = 31;
+const CELL_SIZE_AI = 24;
+
+function drawFood(ctx, x, y, cellSize) {
+  const centerX = x * cellSize + cellSize / 2;
+  const centerY = y * cellSize + cellSize / 2;
+
+  ctx.save();
+  ctx.shadowBlur = 18;
+  ctx.shadowColor = "#fb7185";
+
+  ctx.fillStyle = "#ef4444";
+  ctx.beginPath();
+  ctx.arc(centerX, centerY + 1, cellSize * 0.28, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#f87171";
+  ctx.beginPath();
+  ctx.arc(centerX - cellSize * 0.08, centerY - cellSize * 0.02, cellSize * 0.11, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "#22c55e";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(centerX, centerY - cellSize * 0.16);
+  ctx.quadraticCurveTo(centerX + cellSize * 0.1, centerY - cellSize * 0.34, centerX + cellSize * 0.2, centerY - cellSize * 0.2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawSegment(ctx, x, y, cellSize, isHead) {
+  const left = x * cellSize + 2;
+  const top = y * cellSize + 2;
+  const size = cellSize - 4;
+  const radius = Math.max(6, cellSize * 0.24);
+
+  const gradient = ctx.createLinearGradient(left, top, left + size, top + size);
+  gradient.addColorStop(0, isHead ? "#fef08a" : "#86efac");
+  gradient.addColorStop(0.55, isHead ? "#34d399" : "#22c55e");
+  gradient.addColorStop(1, "#166534");
+
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.roundRect(left, top, size, size, radius);
+  ctx.fill();
+
+  ctx.strokeStyle = isHead ? "#fefce8" : "#14532d";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  if (!isHead) {
+    return;
+  }
+
+  const eyeRadius = Math.max(2, cellSize * 0.07);
+  ctx.fillStyle = "#0f172a";
+  ctx.beginPath();
+  ctx.arc(left + size * 0.34, top + size * 0.36, eyeRadius, 0, Math.PI * 2);
+  ctx.arc(left + size * 0.66, top + size * 0.36, eyeRadius, 0, Math.PI * 2);
+  ctx.fill();
+}
 
 function Snake() {
-  const canvasRef  = useRef(null);
-  const flashRef   = useRef(null);
-  const prevScore  = useRef(0);
-  const prevGameOver = useRef(false);
+  const canvasRef = useRef(null);
+  const { snake, food, obstacles, gridSize, mode } = useSelector((state) => state.game);
 
-  const { snake, food, obstacles, gridSize, score, gameOver } = useSelector(
-    (state) => state.game
-  );
-
-  const [flashClass, setFlashClass] = useState("");
-
-  // Sync score ref
-  useEffect(() => {
-    prevScore.current = score;
-  }, [score]);
-
-  useEffect(() => {
-    if (gameOver && !prevGameOver.current) {
-      setFlashClass("flash-red");
-      const t = setTimeout(() => setFlashClass(""), 700);
-    }
-    prevGameOver.current = gameOver;
-  }, [gameOver]);
-
-  // Rendu canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    const cellSize = mode === "manual" ? CELL_SIZE_MANUAL : CELL_SIZE_AI;
     const ctx = canvas.getContext("2d");
-    const size = gridSize * CELL_SIZE;
-    canvas.width  = size;
+    const size = gridSize * cellSize;
+    canvas.width = size;
     canvas.height = size;
 
-    // Fond
-    ctx.fillStyle = "#020617";
+    const background = ctx.createLinearGradient(0, 0, size, size);
+    background.addColorStop(0, "#020617");
+    background.addColorStop(0.5, "#0b1328");
+    background.addColorStop(1, "#020617");
+    ctx.fillStyle = background;
     ctx.fillRect(0, 0, size, size);
 
-    // Grille légère
-    ctx.strokeStyle = "rgba(148,163,184,0.04)";
-    ctx.lineWidth = 0.5;
-    for (let i = 0; i <= gridSize; i++) {
+    ctx.strokeStyle = "rgba(148, 163, 184, 0.10)";
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= gridSize; i += 1) {
       ctx.beginPath();
-      ctx.moveTo(i * CELL_SIZE, 0);
-      ctx.lineTo(i * CELL_SIZE, size);
+      ctx.moveTo(i * cellSize, 0);
+      ctx.lineTo(i * cellSize, size);
       ctx.stroke();
+
       ctx.beginPath();
-      ctx.moveTo(0, i * CELL_SIZE);
-      ctx.lineTo(size, i * CELL_SIZE);
+      ctx.moveTo(0, i * cellSize);
+      ctx.lineTo(size, i * cellSize);
       ctx.stroke();
     }
 
-    // Obstacles
     obstacles.forEach(({ x, y }) => {
-      const gx = x * CELL_SIZE;
-      const gy = y * CELL_SIZE;
-      ctx.fillStyle = "#374151";
-      ctx.fillRect(gx + 1, gy + 1, CELL_SIZE - 2, CELL_SIZE - 2);
-      // Bordure claire
-      ctx.strokeStyle = "#4b5563";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(gx + 1.5, gy + 1.5, CELL_SIZE - 3, CELL_SIZE - 3);
-    });
-
-    // Nourriture (cercle rouge avec glow)
-    if (food) {
-      const fx = food.x * CELL_SIZE + CELL_SIZE / 2;
-      const fy = food.y * CELL_SIZE + CELL_SIZE / 2;
-      ctx.save();
-      ctx.shadowBlur  = 18;
-      ctx.shadowColor = "#f87171";
-      ctx.fillStyle   = "#ef4444";
-      ctx.beginPath();
-      ctx.arc(fx, fy, CELL_SIZE / 2.8, 0, Math.PI * 2);
-      ctx.fill();
-      // Reflet
-      ctx.shadowBlur = 0;
-      ctx.fillStyle  = "rgba(255,255,255,0.25)";
-      ctx.beginPath();
-      ctx.arc(fx - 2, fy - 2, CELL_SIZE / 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    // Serpent avec effet de traînée (opacité décroissante)
-    const total = snake.length;
-    snake.forEach(({ x, y }, index) => {
-      const isHead = index === 0;
-      const ratio  = 1 - (index / Math.max(total, 1)) * 0.65; // 1.0 → 0.35
-      const gx     = x * CELL_SIZE;
-      const gy     = y * CELL_SIZE;
-      const pad    = isHead ? 1 : 2;
-      const r      = 3; // coin arrondi
-
-      ctx.save();
-      ctx.globalAlpha = ratio;
-
-      if (isHead) {
-        // Tête : glow vert
-        ctx.shadowBlur  = 12;
-        ctx.shadowColor = "#4ade80";
-      }
-
-      const gradient = ctx.createLinearGradient(gx, gy, gx + CELL_SIZE, gy + CELL_SIZE);
-      gradient.addColorStop(0, isHead ? "#bbf7d0" : "#22c55e");
-      gradient.addColorStop(1, isHead ? "#4ade80" : "#166534");
+      const left = x * cellSize + 2;
+      const top = y * cellSize + 2;
+      const sizePx = cellSize - 4;
+      const gradient = ctx.createLinearGradient(left, top, left + sizePx, top + sizePx);
+      gradient.addColorStop(0, "#334155");
+      gradient.addColorStop(1, "#0f172a");
       ctx.fillStyle = gradient;
-
-      // Rectangle arrondi
       ctx.beginPath();
-      ctx.moveTo(gx + pad + r, gy + pad);
-      ctx.lineTo(gx + CELL_SIZE - pad - r, gy + pad);
-      ctx.quadraticCurveTo(gx + CELL_SIZE - pad, gy + pad, gx + CELL_SIZE - pad, gy + pad + r);
-      ctx.lineTo(gx + CELL_SIZE - pad, gy + CELL_SIZE - pad - r);
-      ctx.quadraticCurveTo(gx + CELL_SIZE - pad, gy + CELL_SIZE - pad, gx + CELL_SIZE - pad - r, gy + CELL_SIZE - pad);
-      ctx.lineTo(gx + pad + r, gy + CELL_SIZE - pad);
-      ctx.quadraticCurveTo(gx + pad, gy + CELL_SIZE - pad, gx + pad, gy + CELL_SIZE - pad - r);
-      ctx.lineTo(gx + pad, gy + pad + r);
-      ctx.quadraticCurveTo(gx + pad, gy + pad, gx + pad + r, gy + pad);
-      ctx.closePath();
+      ctx.roundRect(left, top, sizePx, sizePx, Math.max(5, cellSize * 0.18));
       ctx.fill();
-
-      ctx.restore();
     });
 
-    // Overlay game over : teinte rouge sur la grille
-    if (gameOver) {
-      ctx.fillStyle = "rgba(239,68,68,0.08)";
-      ctx.fillRect(0, 0, size, size);
+    if (food) {
+      drawFood(ctx, food.x, food.y, cellSize);
     }
-  }, [snake, food, obstacles, gridSize, gameOver]);
 
-  const sizePx = gridSize * CELL_SIZE;
+    snake.forEach(({ x, y }, index) => {
+      drawSegment(ctx, x, y, cellSize, index === 0);
+    });
+  }, [snake, food, obstacles, gridSize, mode]);
+
+  const cellSize = mode === "manual" ? CELL_SIZE_MANUAL : CELL_SIZE_AI;
+  const sizePx = gridSize * cellSize;
 
   return (
-    <div className="relative inline-block">
-      <canvas
-        ref={canvasRef}
-        width={sizePx}
-        height={sizePx}
-        className="mx-auto rounded-lg border border-slate-800 bg-slate-950 block"
-      />
-      {/* Flash overlay */}
-      {flashClass && (
-        <div
-          ref={flashRef}
-          key={flashClass + Date.now()}
-          className="absolute inset-0 rounded-lg pointer-events-none bg-red-500 flash-red"
-        />
-      )}
-    </div>
+    <canvas
+      ref={canvasRef}
+      width={sizePx}
+      height={sizePx}
+      className="mx-auto rounded-[2rem] border border-slate-700/80 bg-slate-950 shadow-[0_24px_70px_rgba(15,23,42,0.55)]"
+    />
   );
 }
 

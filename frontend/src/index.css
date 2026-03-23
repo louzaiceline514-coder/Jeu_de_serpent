@@ -2,101 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  color-scheme: dark;
+}
+
 body {
   @apply bg-slate-950 text-slate-100;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  min-height: 100vh;
 }
 
-/* ── Transitions de vue ─────────────────────────────── */
-.view-enter {
-  opacity: 0;
-  transform: translateY(6px);
-}
-.view-enter-active {
-  opacity: 1;
-  transform: translateY(0);
-  transition: opacity 0.2s ease, transform 0.2s ease;
+#root {
+  min-height: 100vh;
 }
 
-/* ── Titre glitch ────────────────────────────────────── */
-@keyframes glitch {
-  0%, 90%, 100% { transform: translate(0); clip-path: none; }
-  91%  { transform: translate(-2px,  1px); clip-path: polygon(0 20%, 100% 20%, 100% 40%, 0 40%); }
-  93%  { transform: translate( 2px, -1px); clip-path: polygon(0 60%, 100% 60%, 100% 80%, 0 80%); }
-  95%  { transform: translate(-1px,  2px); clip-path: none; }
-}
-.animate-glitch {
-  animation: glitch 4s infinite;
-}
-
-/* ── Ligne de scan ───────────────────────────────────── */
-@keyframes scan {
-  0%   { top: -4px; opacity: 0.6; }
-  100% { top: 100%; opacity: 0; }
-}
-.scan-line {
-  position: absolute;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, #34d399, transparent);
-  animation: scan 2.8s linear infinite;
-  pointer-events: none;
-}
-
-/* ── Dot WS pulsant ──────────────────────────────────── */
-@keyframes pulse-dot {
-  0%, 100% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
-  50%       { box-shadow: 0 0 0 5px transparent; opacity: 0.6; }
-}
-.pulse-dot {
-  animation: pulse-dot 1.4s ease-in-out infinite;
-}
-
-/* ── Flash vert (nourriture mangée) ─────────────────── */
-@keyframes flash-green {
-  0%   { opacity: 0.5; }
-  100% { opacity: 0; }
-}
-.flash-green {
-  animation: flash-green 0.35s ease-out forwards;
-}
-
-/* ── Flash rouge (game over) ─────────────────────────── */
-@keyframes flash-red {
-  0%   { opacity: 0.55; }
-  100% { opacity: 0; }
-}
-.flash-red {
-  animation: flash-red 0.6s ease-out forwards;
-}
-
-/* ── Entrée welcome ──────────────────────────────────── */
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(14px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.animate-fadeInUp {
-  animation: fadeInUp 0.5s ease forwards;
-}
-
-/* ── Grille de fond animée (welcome) ─────────────────── */
-@keyframes grid-pulse {
-  0%, 100% { opacity: 0.04; }
-  50%       { opacity: 0.09; }
-}
-.bg-grid-animated {
-  background-image:
-    linear-gradient(rgba(52,211,153,0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(52,211,153,0.12) 1px, transparent 1px);
-  background-size: 32px 32px;
-  animation: grid-pulse 3s ease-in-out infinite;
-}
-
-/* ── Game Over overlay ───────────────────────────────── */
-@keyframes gameover-in {
-  from { opacity: 0; transform: scale(0.92); }
-  to   { opacity: 1; transform: scale(1); }
-}
-.animate-gameover {
-  animation: gameover-in 0.3s ease forwards;
+::selection {
+  background: rgba(16, 185, 129, 0.32);
+  color: #f8fafc;
 }

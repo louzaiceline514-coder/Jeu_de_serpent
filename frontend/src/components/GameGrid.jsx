@@ -1,54 +1,27 @@
 import React from "react";
 import { useSelector } from "react-redux";
-import { useDispatch } from "react-redux";
 import Snake from "./Snake";
-import { wsService } from "../services/websocket";
-import { setMode } from "../store/gameSlice";
 
-/* ── Overlay Game Over ───────────────────────────────── */
-function GameOverOverlay({ score, mode, onRestart }) {
-  return (
-    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-slate-950/80 backdrop-blur-sm z-10">
-      <div className="animate-gameover text-center space-y-4 p-8 rounded-2xl border border-red-800/60 bg-slate-900/90 shadow-2xl">
-        <p className="text-3xl font-bold text-red-400">Game Over</p>
-        <p className="text-slate-300 text-sm">Score final</p>
-        <p className="text-5xl font-black text-emerald-400">{score}</p>
-        <button
-          onClick={onRestart}
-          className="mt-2 px-6 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold transition-colors"
-        >
-          Rejouer
-        </button>
-      </div>
-    </div>
-  );
-}
+// Conteneur visuel pour le canvas du jeu.
 
-/* ── GameGrid ─────────────────────────────────────────── */
 function GameGrid() {
-  const dispatch  = useDispatch();
-  const { gameOver, score, mode } = useSelector((s) => s.game);
-
-  const handleRestart = () => {
-    wsService.send("reset", {});
-    dispatch(setMode(mode));
-  };
+  const { mode } = useSelector((state) => state.game);
+  const manualMode = mode === "manual";
 
   return (
-    <div className="flex flex-col items-center justify-center h-full min-h-[70vh] gap-4">
-      {/* Zone de jeu + overlay game over */}
-      <div className="relative">
-        <Snake />
-        {gameOver && (
-          <GameOverOverlay
-            score={score}
-            mode={mode}
-            onRestart={handleRestart}
-          />
-        )}
+    <div className="flex flex-col items-center justify-center h-full min-h-[72vh] space-y-4">
+      <div className="text-center">
+        <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Aire de jeu</p>
+        <h2 className="mt-2 text-2xl font-semibold text-white">
+          {manualMode ? "Vue agrandie pour le mode manuel" : "Vue standard pour les algorithmes"}
+        </h2>
       </div>
-
-      <p className="text-xs text-slate-500">Mode manuel : flèches directionnelles</p>
+      <Snake />
+      <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-center">
+        <p className="text-xs text-slate-400">
+          Contrôles clavier en mode manuel : flèches directionnelles.
+        </p>
+      </div>
     </div>
   );
 }

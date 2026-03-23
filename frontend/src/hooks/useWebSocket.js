@@ -22,8 +22,8 @@ function useWebSocket(enabled = true) {
     alreadyConnectedRef.current = true;
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.hostname;
-    const url = import.meta.env.DEV ? `${protocol}//${host}:5173/ws` : `${protocol}//${host}:8000/ws`;
+    const { host, hostname } = window.location;
+    const url = import.meta.env.DEV ? `${protocol}//${host}/ws` : `${protocol}//${hostname}:8000/ws`;
 
     wsService.connect(
       url,

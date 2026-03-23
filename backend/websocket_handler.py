@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from datetime import datetime
 from typing import Any, Dict
 
 from fastapi import WebSocket
@@ -19,7 +18,6 @@ from game_engine.direction import Direction
 from game_engine.moteur import MoteurJeu
 from models.agent import Agent
 from models.game import Game
-from models.game_event import GameEvent
 from models.stats import AgentStats
 
 
@@ -35,8 +33,6 @@ class GameWebSocketManager:
         self._paused = True
         self._tick_ms = TICK_INTERVAL_MS
         self._game_saved = False
-        self._pending_events: list[dict] = []
-        self._game_start_time: float = time.time()
 
     async def handle(self, websocket: WebSocket) -> None:
         """Boucle principale de gestion du WebSocket."""
@@ -57,6 +53,8 @@ class GameWebSocketManager:
         )
         for task in pending:
             task.cancel()
+        if self._should_persist_current_game():
+            self._enregistrer_partie()
         self._running = False
 
     async def _tick_loop(self, websocket: WebSocket) -> None:
@@ -74,28 +72,8 @@ class GameWebSocketManager:
                         direction = self.agent_rl.choisir_action({"engine": self.engine})
                         self.engine.changer_direction(direction)
 
-                    score_avant = self.engine.score
-                    direction_avant = self.engine.serpent.direction.name
                     self.engine.step()
-                    elapsed = time.time() - self._game_start_time
-
-                    # Événement nourriture mangée
-                    if self.engine.score > score_avant:
-                        self._pending_events.append({
-                            "type": "food",
-                            "timestamp": elapsed,
-                            "score": int(self.engine.score),
-                            "direction": direction_avant,
-                        })
-
-                    # Événement collision / fin de partie
                     if self.engine.game_over and not self._game_saved:
-                        self._pending_events.append({
-                            "type": "collision",
-                            "timestamp": elapsed,
-                            "score": int(self.engine.score),
-                            "direction": direction_avant,
-                        })
                         self._enregistrer_partie()
                         self._game_saved = True
 
@@ -119,12 +97,11 @@ class GameWebSocketManager:
                 msg_type = data.get("type")
 
                 if msg_type == "set_mode":
+                    self._save_before_leaving_current_game()
                     mode = data.get("mode", "manual")
                     self.engine.reset(mode=mode)
                     self._paused = True
                     self._game_saved = False
-                    self._pending_events = []
-                    self._game_start_time = time.time()
                 elif msg_type == "direction":
                     dir_str = data.get("dir")
                     direction = self._parse_direction(dir_str)
@@ -133,11 +110,10 @@ class GameWebSocketManager:
                 elif msg_type == "start":
                     self._paused = False
                 elif msg_type == "reset":
+                    self._save_before_leaving_current_game()
                     self.engine.reset(mode=self.engine.mode)
                     self._paused = True
                     self._game_saved = False
-                    self._pending_events = []
-                    self._game_start_time = time.time()
                 elif msg_type == "set_paused":
                     self._paused = bool(data.get("paused", False))
                 elif msg_type == "set_speed":
@@ -195,11 +171,6 @@ class GameWebSocketManager:
                 score=score,
                 nb_steps=nb_steps,
                 duration=duration,
-                longueur_serpent=len(self.engine.serpent.corps),
-                cause_mort=self.engine.cause_mort or "inconnu",
-                taille_grille=f"{self.engine.grille.largeur}x{self.engine.grille.hauteur}",
-                obstacles_actifs=len(self.engine.grille.obstacles) > 0,
-                date_fin=datetime.utcnow(),
             )
             db.add(game)
 
@@ -239,18 +210,19 @@ class GameWebSocketManager:
             stats.win_rate = wins / stats.games_played if stats.games_played > 0 else 0.0
 
             db.commit()
-            db.refresh(game)
-
-            # Sauvegarde des événements (food + collision)
-            for ev in self._pending_events:
-                db.add(GameEvent(
-                    game_id=game.id,
-                    type_evenement=ev["type"],
-                    timestamp=ev["timestamp"],
-                    score=ev["score"],
-                    direction=ev["direction"],
-                ))
-            db.commit()
-            self._pending_events = []
+            self._game_saved = True
         finally:
             db.close()
+
+    def _should_persist_current_game(self) -> bool:
+        """Indique si la partie courante merite d'etre enregistree."""
+        return (
+            not self._game_saved
+            and self.engine.step_count > 0
+            and (self.engine.score > 0 or self.engine.mode in {"astar", "rl", "manual"})
+        )
+
+    def _save_before_leaving_current_game(self) -> None:
+        """Sauvegarde une partie en cours avant reset/changement de mode."""
+        if self._should_persist_current_game():
+            self._enregistrer_partie()

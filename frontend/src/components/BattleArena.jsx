@@ -142,10 +142,14 @@ const drawGrid = (canvas, gameState, snakeColor, foodColor) => {
   canvas.width = size;
   canvas.height = size;
 
-  ctx.fillStyle = "#020617";
+  const background = ctx.createLinearGradient(0, 0, size, size);
+  background.addColorStop(0, "#020617");
+  background.addColorStop(0.55, "#0b1328");
+  background.addColorStop(1, "#020617");
+  ctx.fillStyle = background;
   ctx.fillRect(0, 0, size, size);
 
-  ctx.strokeStyle = "#1e293b";
+  ctx.strokeStyle = "rgba(148, 163, 184, 0.10)";
   for (let i = 0; i <= GRID_SIZE; i += 1) {
     ctx.beginPath();
     ctx.moveTo(i * CELL_SIZE, 0);
@@ -158,37 +162,62 @@ const drawGrid = (canvas, gameState, snakeColor, foodColor) => {
     ctx.stroke();
   }
 
-  ctx.fillStyle = "#475569";
   gameState.obstacles.forEach(({ x, y }) => {
-    ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    const left = x * CELL_SIZE + 2;
+    const top = y * CELL_SIZE + 2;
+    const gradient = ctx.createLinearGradient(left, top, left + CELL_SIZE, top + CELL_SIZE);
+    gradient.addColorStop(0, "#475569");
+    gradient.addColorStop(1, "#0f172a");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.roundRect(left, top, CELL_SIZE - 4, CELL_SIZE - 4, 4);
+    ctx.fill();
   });
 
   ctx.fillStyle = "#94a3b8";
   gameState.dynamic_obstacles.forEach(({ x, y }) => {
-    ctx.fillRect(x * CELL_SIZE + 3, y * CELL_SIZE + 3, CELL_SIZE - 6, CELL_SIZE - 6);
+    ctx.beginPath();
+    ctx.roundRect(x * CELL_SIZE + 3, y * CELL_SIZE + 3, CELL_SIZE - 6, CELL_SIZE - 6, 4);
+    ctx.fill();
   });
 
   if (gameState.food) {
+    const cx = gameState.food.x * CELL_SIZE + CELL_SIZE / 2;
+    const cy = gameState.food.y * CELL_SIZE + CELL_SIZE / 2;
+    ctx.save();
+    ctx.shadowBlur = 16;
+    ctx.shadowColor = foodColor;
     ctx.fillStyle = foodColor;
     ctx.beginPath();
-    ctx.arc(
-      gameState.food.x * CELL_SIZE + CELL_SIZE / 2,
-      gameState.food.y * CELL_SIZE + CELL_SIZE / 2,
-      CELL_SIZE / 3,
-      0,
-      Math.PI * 2
-    );
+    ctx.arc(cx, cy + 1, CELL_SIZE / 3.2, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = "#22c55e";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 4);
+    ctx.quadraticCurveTo(cx + 2, cy - 8, cx + 5, cy - 5);
+    ctx.stroke();
+    ctx.restore();
   }
 
   gameState.snake.forEach((segment, index) => {
-    ctx.fillStyle = index === 0 ? snakeColor : `${snakeColor}88`;
-    ctx.fillRect(
-      segment.x * CELL_SIZE + 1,
-      segment.y * CELL_SIZE + 1,
-      CELL_SIZE - 2,
-      CELL_SIZE - 2
-    );
+    const left = segment.x * CELL_SIZE + 1.5;
+    const top = segment.y * CELL_SIZE + 1.5;
+    const gradient = ctx.createLinearGradient(left, top, left + CELL_SIZE, top + CELL_SIZE);
+    gradient.addColorStop(0, index === 0 ? "#fef08a" : `${snakeColor}cc`);
+    gradient.addColorStop(1, snakeColor);
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.roundRect(left, top, CELL_SIZE - 3, CELL_SIZE - 3, 5);
+    ctx.fill();
+
+    if (index === 0) {
+      ctx.fillStyle = "#0f172a";
+      ctx.beginPath();
+      ctx.arc(left + 6, top + 6, 1.4, 0, Math.PI * 2);
+      ctx.arc(left + 12, top + 6, 1.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
   });
 };
 
@@ -329,22 +358,6 @@ function BattleArena() {
     };
   };
 
-  const updateLiveStats = (setter, currentStats, meta) => {
-    const samples = currentStats.samples + 1;
-    const avgInferenceMs =
-      (currentStats.avgInferenceMs * currentStats.samples + (meta.inference_ms ?? 0)) / samples;
-
-    setter({
-      ...currentStats,
-      inferenceMs: meta.inference_ms ?? 0,
-      avgInferenceMs,
-      epsilon: currentStats.agentType === "rl" ? meta.epsilon ?? 0 : null,
-      safetyScore: meta.safety_score ?? 0,
-      analysis: meta.analysis ?? "Analyse indisponible",
-      samples
-    });
-  };
-
   const startBattle = async () => {
     if (isRunning) {
       return;
@@ -359,8 +372,9 @@ function BattleArena() {
 
     try {
       const baseState = await initBattleState();
+      const roundNumber = currentRound + 1;
 
-      setCurrentRound((value) => value + 1);
+      setCurrentRound(roundNumber);
       setAstarGame(cloneState(baseState));
       setRlGame(cloneState(baseState));
 
@@ -438,7 +452,7 @@ function BattleArena() {
         setBattleHistory((history) => [
           ...history,
           {
-            round: currentRound + 1,
+            round: roundNumber,
             astarScore: nextAstarState.score,
             rlScore: nextRlState.score,
             astarSteps: nextAstarState.step_count,
@@ -480,9 +494,9 @@ function BattleArena() {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h1 className="text-2xl font-bold text-slate-100 mb-2">A* vs Q-Learning Battle Arena</h1>
+        <h1 className="text-3xl font-bold text-slate-100 mb-2">Battle Arena IA</h1>
         <p className="text-slate-400">
-          Duel en temps reel avec la logique backend reelle des deux agents.
+          Duel en temps réel avec latence mesurée, sécurité de zone et résultats réels de chaque partie.
         </p>
         {error ? <p className="mt-3 text-sm text-red-400">{error}</p> : null}
       </div>
@@ -533,7 +547,7 @@ function BattleArena() {
         <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
           <h3 className="text-lg font-semibold text-slate-100 mb-1">Graphique en barres</h3>
           <p className="text-sm text-slate-400 mb-4">
-            Comparaison directe des indicateurs live entre A* et Q-Learning.
+            Données live de la manche en cours : score, steps, rendement, latence et sécurité.
           </p>
           <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
