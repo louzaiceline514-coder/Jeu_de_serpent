@@ -17,6 +17,7 @@ import {
 
 function TrainingPanel() {
   const [episodes, setEpisodes] = useState(80);
+  const [withObstacles, setWithObstacles] = useState(true);
   const [loading, setLoading] = useState("");
   const dispatch = useDispatch();
   const {
@@ -33,7 +34,7 @@ function TrainingPanel() {
   const handleRun = async (agentType) => {
     setLoading(agentType);
     try {
-      await api.post("/api/training/start", { episodes, agent_type: agentType });
+      await api.post("/api/training/start", { episodes, agent_type: agentType, with_obstacles: withObstacles });
       await dispatch(fetchTrainingResults());
     } finally {
       setLoading("");
@@ -104,12 +105,12 @@ function TrainingPanel() {
         </div>
       </div>
 
-      <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4">
-        <div className="flex items-center justify-between gap-4 mb-3">
+      <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-4 space-y-4">
+        <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-medium text-slate-100">Nombre d&apos;episodes</p>
+            <p className="text-sm font-medium text-slate-100">Nombre d&apos;épisodes</p>
             <p className="text-xs text-slate-400">
-              Meme volume de test pour comparer proprement les deux algorithmes.
+              Même volume de test pour comparer proprement les deux algorithmes.
             </p>
           </div>
           <input
@@ -121,6 +122,27 @@ function TrainingPanel() {
             max={100}
           />
         </div>
+        <div className="flex items-center justify-between gap-4 border-t border-slate-700 pt-4">
+          <div>
+            <p className="text-sm font-medium text-slate-100">Mode performance (sans obstacles)</p>
+            <p className="text-xs text-slate-400">
+              Désactive tous les obstacles pour atteindre A*&gt;200 / RL&gt;150 — objectifs du CDC.
+            </p>
+          </div>
+          <button
+            onClick={() => setWithObstacles((v) => !v)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${withObstacles ? "bg-slate-600" : "bg-emerald-500"}`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${withObstacles ? "translate-x-1" : "translate-x-6"}`}
+            />
+          </button>
+        </div>
+        {!withObstacles && (
+          <p className="text-xs text-amber-300 bg-amber-500/10 rounded-lg px-3 py-2 border border-amber-500/20">
+            Mode performance actif — grille sans obstacles, scores élevés attendus (A*&gt;200, RL&gt;50).
+          </p>
+        )}
       </div>
 
       <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">

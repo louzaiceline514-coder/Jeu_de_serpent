@@ -8,12 +8,14 @@ import TrainingPanel from "./components/TrainingPanel";
 import AmbientAudioControls from "./components/AmbientAudioControls";
 import useWebSocket from "./hooks/useWebSocket";
 import useKeyboard from "./hooks/useKeyboard";
+import useSoundEffects from "./hooks/useSoundEffects";
 
 function App() {
   const [hasEntered, setHasEntered] = useState(false);
   const [view, setView] = useState("game"); // "game" | "battle" | "stats" | "training"
   useWebSocket(hasEntered);
   useKeyboard(hasEntered);
+  useSoundEffects();
 
   if (!hasEntered) {
     return (

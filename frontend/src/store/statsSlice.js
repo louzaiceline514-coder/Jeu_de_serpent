@@ -21,9 +21,9 @@ export const fetchTrainingResults = createAsyncThunk(
 );
 
 const initialState = {
-  manual: { avg_score: 0, best_score: 0, games_played: 0, win_rate: 0, avg_steps: 0, avg_duration: 0 },
-  astar: { avg_score: 0, best_score: 0, games_played: 0, win_rate: 0 },
-  rl: { avg_score: 0, best_score: 0, games_played: 0, win_rate: 0 },
+  manual: { avg_score: 0, best_score: 0, games_played: 0, win_rate: 0, avg_steps: 0, avg_duration: 0, median_score: 0, last_score: 0, recent_avg_score: 0 },
+  astar: { avg_score: 0, best_score: 0, games_played: 0, win_rate: 0, median_score: 0, last_score: 0, recent_avg_score: 0 },
+  rl: { avg_score: 0, best_score: 0, games_played: 0, win_rate: 0, median_score: 0, last_score: 0, recent_avg_score: 0 },
   history: [],
   rlTrainingScores: [],
   astarBenchmarkScores: [],

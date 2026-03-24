@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+
 from typing import Any, Dict
 
 from fastapi import WebSocket
@@ -18,6 +19,7 @@ from game_engine.direction import Direction
 from game_engine.moteur import MoteurJeu
 from models.agent import Agent
 from models.game import Game
+from models.game_event import GameEvent
 from models.stats import AgentStats
 
 
@@ -33,6 +35,8 @@ class GameWebSocketManager:
         self._paused = True
         self._tick_ms = TICK_INTERVAL_MS
         self._game_saved = False
+        self._replay_frames: list = []
+        self._max_replay_frames = 1500
 
     async def handle(self, websocket: WebSocket) -> None:
         """Boucle principale de gestion du WebSocket."""
@@ -73,6 +77,8 @@ class GameWebSocketManager:
                         self.engine.changer_direction(direction)
 
                     self.engine.step()
+                    if len(self._replay_frames) < self._max_replay_frames:
+                        self._replay_frames.append(self.engine.get_state_dict())
                     if self.engine.game_over and not self._game_saved:
                         self._enregistrer_partie()
                         self._game_saved = True
@@ -102,6 +108,7 @@ class GameWebSocketManager:
                     self.engine.reset(mode=mode)
                     self._paused = True
                     self._game_saved = False
+                    self._replay_frames = []
                 elif msg_type == "direction":
                     dir_str = data.get("dir")
                     direction = self._parse_direction(dir_str)
@@ -114,6 +121,7 @@ class GameWebSocketManager:
                     self.engine.reset(mode=self.engine.mode)
                     self._paused = True
                     self._game_saved = False
+                    self._replay_frames = []
                 elif msg_type == "set_paused":
                     self._paused = bool(data.get("paused", False))
                 elif msg_type == "set_speed":
@@ -210,6 +218,23 @@ class GameWebSocketManager:
             stats.win_rate = wins / stats.games_played if stats.games_played > 0 else 0.0
 
             db.commit()
+            db.refresh(game)
+
+            # Sauvegarde des frames de replay
+            if self._replay_frames:
+                replay_start = time.time() - len(self._replay_frames) * (self._tick_ms / 1000.0)
+                for i, frame in enumerate(self._replay_frames):
+                    db.add(GameEvent(
+                        game_id=game.id,
+                        type_evenement="frame",
+                        details_json=json.dumps(frame, separators=(",", ":")),
+                        timestamp=round(i * (self._tick_ms / 1000.0), 3),
+                        score=frame.get("score", 0),
+                        direction=frame.get("direction"),
+                    ))
+                db.commit()
+                self._replay_frames = []
+
             self._game_saved = True
         finally:
             db.close()

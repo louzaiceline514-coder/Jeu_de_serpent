@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Dict, List
 
 # Taille de la grille (carrée)
-GRID_SIZE: int = int(os.getenv("GRID_SIZE", "20"))
+GRID_SIZE: int = int(os.getenv("GRID_SIZE", "25"))
 
 # Base directory du projet
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -60,6 +60,12 @@ OBSTACLE_SETTINGS: Dict[str, Dict[str, int]] = {
         "spawn_interval": 5,
         "max_dynamic_obstacles": 5,
         "dynamic_lifetime": 10,
+    },
+    "performance": {
+        "static_obstacles": 0,
+        "spawn_interval": 999,
+        "max_dynamic_obstacles": 0,
+        "dynamic_lifetime": 0,
     },
 }
 

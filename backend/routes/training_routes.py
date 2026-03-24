@@ -24,6 +24,7 @@ class TrainingRequest(BaseModel):
 
     episodes: int = 1000
     agent_type: str = "rl"  # "rl" ou "astar"
+    with_obstacles: bool = True  # False = mode performance sans obstacles
 
 
 _trainer: Optional[Trainer] = None
@@ -63,9 +64,12 @@ async def start_training(payload: TrainingRequest) -> dict:
     episodes = min(payload.episodes, 100)  # Limite à 100 épisodes max pour éviter timeout
     loop = asyncio.get_event_loop()
 
+    mode_rl = "training" if payload.with_obstacles else "performance"
+    mode_astar = "astar" if payload.with_obstacles else "performance"
+
     if payload.agent_type == "rl":
         trainer = get_trainer()
-        await loop.run_in_executor(None, partial(trainer.entrainer, episodes, None))
+        await loop.run_in_executor(None, partial(trainer.entrainer, episodes, None, mode_rl))
         # Invalide le singleton RL de la BattleArena pour qu'il recharge la Q-table à jour
         from routes.agent_routes import reset_rl_singleton
         reset_rl_singleton()
@@ -83,7 +87,7 @@ async def start_training(payload: TrainingRequest) -> dict:
         agent_astar = AgentAStar()
         scores: list[int] = []
         for _ in range(episodes):
-            moteur.reset(mode="astar")
+            moteur.reset(mode=mode_astar)
             steps = 0
             max_steps = 500
             while not moteur.game_over and steps < max_steps:

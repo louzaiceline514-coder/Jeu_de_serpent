@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from statistics import mean
+from statistics import mean, median
 from typing import List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models.agent import Agent
 from models.game import Game
+from models.game_event import GameEvent
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
@@ -29,6 +30,7 @@ def _empty_stats() -> dict:
         "avg_duration": 0.0,
         "last_score": 0,
         "recent_avg_score": 0.0,
+        "median_score": 0.0,
     }
 
 
@@ -55,6 +57,7 @@ def _compute_stats(db: Session, agent: Agent | None) -> dict:
         "avg_duration": sum(durations) / games_played,
         "last_score": scores[-1],
         "recent_avg_score": mean(recent_scores),
+        "median_score": median(scores),
     }
 
 
@@ -85,6 +88,7 @@ def stats_history(db: Session = Depends(get_db)) -> List[dict]:
     for game, agent in games:
         history.append(
             {
+                "game_id": game.id,
                 "agent_type": _agent_key(agent.type),
                 "agent_name": agent.name,
                 "score": game.score,
@@ -94,3 +98,33 @@ def stats_history(db: Session = Depends(get_db)) -> List[dict]:
             }
         )
     return history
+
+
+@router.get("/replay/{game_id}")
+def get_replay(game_id: int, db: Session = Depends(get_db)) -> dict:
+    """Retourne les frames enregistrées pour rejouer une partie."""
+    game = db.query(Game).filter(Game.id == game_id).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Partie introuvable")
+
+    events = (
+        db.query(GameEvent)
+        .filter(GameEvent.game_id == game_id, GameEvent.type_evenement == "frame")
+        .order_by(GameEvent.timestamp.asc())
+        .all()
+    )
+
+    import json
+    frames = []
+    for event in events:
+        try:
+            frames.append(json.loads(event.details_json))
+        except Exception:
+            pass
+
+    return {
+        "game_id": game_id,
+        "score": game.score,
+        "nb_steps": game.nb_steps,
+        "frames": frames,
+    }

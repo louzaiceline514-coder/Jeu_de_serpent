@@ -37,6 +37,7 @@ class Trainer:
         self,
         nb_episodes: int,
         callback_progression: Optional[Callable[[int, int, int], None]] = None,
+        mode: str = "training",
     ) -> None:
         """Lance la boucle d'entraînement RL et sauvegarde les résultats dans un CSV.
 
@@ -50,7 +51,7 @@ class Trainer:
         try:
             for episode in range(1, nb_episodes + 1):
                 # Reset de l'environnement et mesure du temps
-                self.moteur.reset(mode="rl")
+                self.moteur.reset(mode=mode)
 
                 # Une session d'entraînement dans l'environnement
                 scores = self.agent.entrainer(1, self.moteur)

@@ -43,6 +43,7 @@ class AgentStepRequest(BaseModel):
 
     agent_type: str
     game_state: dict[str, Any]
+    forced_direction: str | None = None  # utilisé pour agent_type="manual"
 
 
 class AgentInitRequest(BaseModel):
@@ -121,6 +122,8 @@ def _select_agent(agent_type: str) -> Any:
         return AgentAStar()
     if agent_type == "rl":
         return _get_rl_agent()
+    if agent_type == "manual":
+        return None  # direction gérée via forced_direction
     raise HTTPException(status_code=400, detail=f"Agent type non supporte: {agent_type}")
 
 
@@ -236,7 +239,10 @@ def agent_step(request: AgentStepRequest) -> dict:
     started_at = perf_counter()
 
     if not moteur.game_over:
-        direction = agent.choisir_action({"engine": moteur})
+        if request.agent_type == "manual":
+            direction = _direction_from_name(request.forced_direction) if request.forced_direction else moteur.serpent.direction
+        else:
+            direction = agent.choisir_action({"engine": moteur})
         moteur.changer_direction(direction)
         moteur.step()
 
