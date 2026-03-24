@@ -1,9 +1,10 @@
 # Snake AI – SAE4 · Licence 3 Informatique UPJV
 
-Application web complète autour du jeu du serpent (Snake Game), comparant trois agents :
-- **Humain** : contrôle au clavier
-- **A\*** : pathfinding optimal avec heuristique de Manhattan
-- **Q-Learning** : apprentissage par renforcement tabulaire
+Application web complète autour du jeu du serpent (Snake Game), comparant deux agents IA :
+- **A\*** : pathfinding optimal avec heuristique de Manhattan + flood fill
+- **Q-Learning** : apprentissage par renforcement tabulaire (Q-table, 11 features)
+
+Le mode Manuel permet de jouer soi-même au clavier.
 
 ---
 
@@ -142,18 +143,17 @@ Affiche en temps réel : score, nombre de steps, mode actif, état de la partie 
 
 Accessible via le bouton **A\* vs Q-Learning**.
 
-Ce mode lance **simultanément** trois serpents indépendants sur la même grille :
-- Serpent bleu : **Humain** (contrôlable au clavier)
+Ce mode lance **simultanément** deux serpents IA indépendants sur la même grille :
 - Serpent vert : **Agent A\***
 - Serpent orange : **Agent Q-Learning**
 
 **Fonctionnement :**
-1. Cliquez **Lancer la simulation** pour démarrer les trois agents.
+1. Cliquez **Lancer la simulation** pour démarrer les deux agents.
 2. Les graphiques en temps réel (BarChart, RadarChart) s'affichent à droite.
 3. Les statistiques live (score, steps, temps d'inférence, epsilon pour RL) sont mises à jour à chaque tick.
-4. En fin de simulation, un tableau comparatif résume les performances.
+4. En fin de simulation, un tableau comparatif et une **heatmap** résument les positions visitées par chaque agent.
 
-> Les trois agents jouent en mode **battle** : obstacles statiques et dynamiques activés.
+> Les deux agents jouent sur une grille **25×25** avec obstacles statiques et dynamiques activés.
 
 ---
 
@@ -167,11 +167,14 @@ Permet de lancer un entraînement RL ou un benchmark A* :
 |---|---|
 | **Type d'agent** | RL (Q-Learning) ou A* (benchmark) |
 | **Nombre d'épisodes** | Nombre de parties à jouer (max 100 par requête) |
+| **Mode performance** | Désactive les obstacles pour accélérer l'entraînement |
 | **Bouton Lancer** | Démarre l'entraînement/benchmark côté serveur |
 
 **Résultats :**
 - Courbe des scores par épisode (LineChart)
 - Résumé : score moyen, meilleur score, taux de survie
+
+**Mode performance** : activez le toggle "Mode performance (sans obstacles)" pour entraîner le RL sur une grille vide. L'apprentissage converge plus vite, puis vous pouvez reprendre l'entraînement avec obstacles pour la robustesse.
 
 Pour le RL, la Q-table est sauvegardée automatiquement dans `qtable.json` à la racine du projet et rechargée à chaque démarrage du backend.
 
@@ -185,13 +188,20 @@ Accessible via le bouton **Stats**.
 
 Affiche la comparaison des performances entre A* et Q-Learning basée sur les parties réellement enregistrées en base de données :
 
-- **Score moyen** par agent
+- **Score moyen** et **score médian** par agent
 - **Meilleur score** par agent
 - **Taux de survie** (proportion de parties avec score > 0)
 - **Nombre de parties jouées**
-- **Historique des parties** (tableau des 200 dernières parties IA)
+- **Historique des parties** (tableau des 200 dernières parties IA) avec bouton **replay** (▶) par ligne
 
-Les données sont récupérées depuis les routes `/api/stats/comparison` et `/api/stats/history`.
+**Exports disponibles :**
+- **CSV** : export brut de l'historique
+- **JSON** : export structuré complet
+- **PDF** : rapport formaté (via jsPDF)
+
+**Replay** : cliquez ▶ sur une partie pour la rejouer frame par frame dans un player dédié (lecture, pause, seek, vitesse ×0.5/×1/×2).
+
+Les données sont récupérées depuis les routes `/api/stats/comparison`, `/api/stats/history` et `/api/stats/replay/{game_id}`.
 
 ---
 
@@ -213,18 +223,30 @@ Les données sont récupérées depuis les routes `/api/stats/comparison` et `/a
 
 ### Tests backend (pytest)
 
+Depuis le dossier `backend/` :
+
 ```bash
 cd backend
 python -m pytest tests/ -v
+```
+
+Ou depuis la racine du projet :
+
+```bash
+pytest tests/ -v
 ```
 
 Couverture :
 - `test_serpent.py` : déplacement, croissance, collisions, demi-tour
 - `test_grille.py` : génération nourriture/obstacles, voisins, NumPy grid
 - `test_moteur.py` : cycle de jeu, step, reset, cause_mort
-- `test_astar.py` : chemin simple, obstacles, fallback survie, anti-demi-tour
-- `test_rl.py` : encodage état (11 features), mise à jour Q-table, décroissance epsilon
-- `test_api.py` : routes REST /game/start, /game/step, /api/health
+- `test_astar.py` : chemin simple, heuristique Manhattan, obstacles, fallback survie
+- `test_rl.py` : encodage état (11 features), mise à jour Q-table, équation de Bellman, décroissance epsilon, sauvegarde/chargement Q-table
+- `test_classes_diagramme.py` : Nourriture, Obstacle, CollecteurStatistiques, ControleurJeu
+- `test_functional.py` : sessions complètes A*, RL et humain (E2E sans DB)
+- `test_integration.py` : persistance SQLite, flux agent-moteur, latences A* et RL
+- `test_api.py` : routes REST /api/health, /api/game, /api/stats, /api/agents
+- `test_websocket.py` : connexion WebSocket, messages start/step/reset
 
 ### Tests frontend (Vitest)
 
@@ -275,10 +297,14 @@ SnakeGAME_final/
 │   │   ├── agent_rl.py         # Agent Q-Learning avec encodage NumPy
 │   │   └── base_agent.py       # Classe abstraite Agent
 │   ├── game_engine/
-│   │   ├── direction.py        # Enum Direction (HAUT/BAS/GAUCHE/DROITE)
-│   │   ├── grille.py           # Grille + to_numpy_grid() NumPy
-│   │   ├── moteur.py           # Moteur de jeu (step, reset, cause_mort)
-│   │   └── serpent.py          # Logique du serpent
+│   │   ├── direction.py              # Enum Direction (HAUT/BAS/GAUCHE/DROITE)
+│   │   ├── grille.py                 # Grille + to_numpy_grid() NumPy
+│   │   ├── moteur.py                 # Moteur de jeu (step, reset, cause_mort)
+│   │   ├── serpent.py                # Logique du serpent
+│   │   ├── nourriture.py             # Classe Nourriture (diagramme de classes)
+│   │   ├── obstacle.py               # Classe Obstacle statique/dynamique
+│   │   ├── collecteur_statistiques.py # Agrégation des stats de parties
+│   │   └── controleur_jeu.py         # Façade ControleurJeu (diagramme de classes)
 │   ├── models/
 │   │   ├── agent.py            # Table agents
 │   │   ├── game.py             # Table games (avec cause_mort, longueur_serpent…)
@@ -299,29 +325,36 @@ SnakeGAME_final/
 ├── frontend/
 │   └── src/
 │       ├── components/
-│       │   ├── BattleArena.jsx     # Vue A* vs Q-Learning en temps réel
+│       │   ├── BattleArena.jsx     # Vue A* vs Q-Learning + heatmap post-battle
 │       │   ├── ControlPanel.jsx    # Panneau Start/Pause/Reset/Mode/Vitesse
 │       │   ├── Dashboard.jsx       # Dashboard score/steps/mode/état
 │       │   ├── GameGrid.jsx        # Canvas de la grille de jeu
-│       │   ├── StatsComparison.jsx # Comparaison statistiques A* vs RL
-│       │   └── TrainingPanel.jsx   # Panneau d'entraînement
+│       │   ├── ReplayViewer.jsx    # Lecteur de replay frame par frame
+│       │   ├── StatsComparison.jsx # Comparaison stats + export CSV/JSON/PDF
+│       │   └── TrainingPanel.jsx   # Panneau d'entraînement + mode performance
+│       ├── hooks/
+│       │   └── useSoundEffects.js  # Sons Web Audio API (miam/boom/level-up)
 │       ├── store/
-│       │   ├── gameSlice.js    # État du jeu (snake, food, score…)
-│       │   ├── statsSlice.js   # Statistiques comparatives
-│       │   ├── uiSlice.js      # UI (vitesse, audio, vue active)
+│       │   ├── gameSlice.js    # État du jeu (snake, food, score, grille 25×25)
+│       │   ├── statsSlice.js   # Statistiques comparatives (+ score médian)
 │       │   └── wsSlice.js      # État de la connexion WebSocket
 │       └── tests/
 │           ├── setup.js
 │           ├── gameSlice.test.js
 │           ├── uiSlice.test.js
 │           └── Dashboard.test.jsx
-├── tests/                      # Tests backend pytest
-│   ├── test_serpent.py
-│   ├── test_grille.py
-│   ├── test_moteur.py
-│   ├── test_astar.py
-│   ├── test_rl.py
-│   └── test_api.py
+├── tests/                      # Tests backend pytest (depuis la racine)
+│   ├── test_serpent.py         # Tests unitaires Serpent
+│   ├── test_grille.py          # Tests unitaires Grille
+│   ├── test_moteur.py          # Tests unitaires MoteurJeu
+│   ├── test_astar.py           # Tests unitaires AgentAStar
+│   ├── test_rl.py              # Tests unitaires AgentQL (Bellman, epsilon, Q-table)
+│   ├── test_api.py             # Tests d'intégration API REST
+│   └── backend/tests/          # Tests supplémentaires backend
+│       ├── test_functional.py      # Tests E2E sessions complètes
+│       ├── test_integration.py     # Tests SQLite + latences
+│       ├── test_classes_diagramme.py # Tests Nourriture/Obstacle/ControleurJeu
+│       └── test_websocket.py       # Tests WebSocket
 ├── start.bat                    # Script de lancement automatique (Windows)
 ├── qtable.json                 # Q-table sauvegardée (générée à l'entraînement)
 ├── training_results.csv        # Scores par épisode (généré à l'entraînement)
