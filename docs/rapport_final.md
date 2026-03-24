@@ -46,16 +46,21 @@ et resultats obtenus, retour d'experience, conclusion sur les suites possibles, 
 | Battle Arena temps reel | Atteint | Duel A* vs Q-Learning avec graphiques |
 | Panneau entrainement RL | Atteint | Entrainement et benchmark depuis interface |
 | Page statistiques | Atteint | Comparaison A* vs Q-Learning, export CSV |
-| Tests automatises | Atteint | 45 tests pytest + 3 suites Vitest |
+| Tests automatises | Atteint | 88 tests pytest (unitaires, intégration, E2E, WebSocket) |
 | CI/CD GitHub Actions | Atteint | Pipeline automatique sur chaque push |
 
 Tous les objectifs techniques ont ete atteints.
 
 Points qui depassent les specifications initiales :
+- Grille 25x25 (au lieu de 20x20 initial)
 - Obstacles dynamiques en mode Battle Arena
-- Export CSV des statistiques
+- Export CSV, JSON et PDF des statistiques
+- Replay frame par frame des parties enregistrees
+- Heatmap des positions visitees par chaque agent
+- Sons Web Audio API (miam, boom, level-up)
+- Score median en plus du score moyen
+- Mode performance (sans obstacles) pour l'entrainement RL
 - Script de lancement automatique (start.bat)
-- Score de securite de zone en temps reel pour chaque agent IA
 
 ### 2.2 Objectifs organisationnels
 
@@ -134,12 +139,81 @@ utilisateur), SQLite est pleinement suffisant.
 | Legere en memoire (18.7 Ko pour 254 etats) | Necessite beaucoup d'episodes pour converger |
 | Pas de GPU ou bibliotheque ML necessaire | Performances plafonnees face a A* (connaissance incomplete) |
 
-Avec une grille 20x20 et 11 features binaires, l'espace theorique est 2^11 = 2048 etats
+Avec une grille 25x25 et 11 features binaires, l'espace theorique est 2^11 = 2048 etats
 possibles. Apres 80 episodes d'entrainement, seulement 254 etats distincts ont ete visites
 (12.4% de l'espace total), ce qui explique les performances limitees du Q-Learning.
 
 Un Deep Q-Network (DQN) resoudrait ces limites en generalisant sur des etats non vus,
 au cout d'une complexite d'implementation bien superieure.
+
+---
+
+### 2.4.1 Justification du choix des 11 features
+
+Les 11 features binaires ont ete choisies selon trois criteres : minimiser l'espace d'etats,
+capturer les informations critiques pour la survie, et garantir un encodage O(1).
+
+**Decomposition des 11 features :**
+
+| # | Feature | Valeur | Role |
+|---|---|---|---|
+| 1 | Danger immédiat devant | 0/1 | Collision dans la prochaine case (mur, corps, obstacle) |
+| 2 | Danger immédiat à gauche (relatif) | 0/1 | Idem à gauche selon la direction courante |
+| 3 | Danger immédiat à droite (relatif) | 0/1 | Idem à droite selon la direction courante |
+| 4 | Direction actuelle : HAUT | 0/1 | One-hot encoding sur 4 bits |
+| 5 | Direction actuelle : BAS | 0/1 | One-hot encoding sur 4 bits |
+| 6 | Direction actuelle : GAUCHE | 0/1 | One-hot encoding sur 4 bits |
+| 7 | Direction actuelle : DROITE | 0/1 | One-hot encoding sur 4 bits |
+| 8 | Nourriture en haut | 0/1 | Position relative de la nourriture |
+| 9 | Nourriture en bas | 0/1 | Position relative de la nourriture |
+| 10 | Nourriture à gauche | 0/1 | Position relative de la nourriture |
+| 11 | Nourriture à droite | 0/1 | Position relative de la nourriture |
+
+Ces features encodent trois informations essentielles : eviter la mort immediate (features 1-3),
+connaitre l'orientation (features 4-7), et se diriger vers la nourriture (features 8-11).
+
+**Pourquoi pas plus de features ?**
+
+Le choix de 11 features est un compromis delibere entre capacite de representation et
+tractabilite de l'apprentissage. Avec N features binaires, l'espace d'etats croit en 2^N :
+
+| Nombre de features | Etats theoriques | Episodes necessaires (estimation) |
+|---|---|---|
+| 11 (implementation actuelle) | 2 048 | ~100-200 |
+| 15 | 32 768 | ~500-1 000 |
+| 20 | 1 048 576 | ~5 000-10 000 |
+| Grille complete 25x25 | 2^625 (infini) | Impossible (tabul.) |
+
+Au-dela de 15-16 features, la Q-table ne converge plus dans un nombre raisonnable
+d'episodes : la majorite des etats ne sera jamais visitee, et l'agent ne saura pas
+quoi faire dans ces etats (valeurs Q = 0 par defaut → comportement aleatoire).
+
+---
+
+### 2.4.2 Limite principale : l'horizon temporel court
+
+La limite fondamentale n'est pas le nombre de features mais leur nature : les 11 features
+capturent uniquement l'environnement **immediat** (cases voisines). Elles ne permettent
+pas de modeliser la forme globale du serpent ni d'anticiper un piege a plusieurs cases.
+
+Exemple concret : un serpent de longueur 30 sur une grille 25x25 peut creer un couloir
+ferme que les 11 features ne detectent pas. L'agent fonce dans le couloir car aucun danger
+immediat n'est signale, puis se retrouve bloque. C'est precisement ce phenomene qui
+explique le plafond observe autour du score 30.
+
+**Ce qui ameliorerait les performances (et pourquoi on ne l'a pas fait) :**
+
+| Amelioration | Gain estime | Complexite ajoutee |
+|---|---|---|
+| Ajouter l'espace libre (flood fill count, discretise en 3 niveaux) | +10 a +20 pts de score moyen | Moyenne : 3 niveaux x 2^11 = 6 144 etats |
+| Ajouter le danger a 2 cases de distance | +5 a +10 pts | Faible : +3 features = 2^14 = 16 384 etats |
+| Encoder la distance a la nourriture (5 niveaux) | +5 pts | Moyenne : 5^2 x 2^7 = 3 200 etats |
+| Deep Q-Network (grille 25x25 complete) | +50 a +100 pts | Tres elevee : PyTorch, GPU recommande |
+
+L'ajout du flood fill aurait ete la piste la plus prometteuse dans le cadre de ce projet,
+car il resoudrait le probleme des culs-de-sac sans exploser l'espace d'etats de maniere
+incontrolable. Nous avons prefere garder un modele simple et interpretable conforme
+aux objectifs de la SAE, qui compare les approches plutot que d'optimiser une seule.
 
 ---
 
@@ -150,7 +224,7 @@ au cout d'une complexite d'implementation bien superieure.
 | Composant | Taille |
 |---|---|
 | Q-table (qtable.json) | 18.7 Ko — 254 etats x 4 valeurs Q |
-| Grille NumPy 20x20 uint8 | 400 octets (20 x 20 x 1 octet) |
+| Grille NumPy 25x25 uint8 | 625 octets (25 x 25 x 1 octet) |
 | Base de donnees snake.db | 64.0 Ko (apres plusieurs parties) |
 | Etat du jeu (dict Python) | ~500 octets par tick WebSocket |
 
