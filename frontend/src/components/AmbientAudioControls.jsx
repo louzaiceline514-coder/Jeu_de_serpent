@@ -10,10 +10,31 @@ function AmbientAudioControls() {
     if (!audio) return;
     audio.volume = volume / 100;
     audio.loop = true;
-    return () => {
+    if (!isMuted) {
+      audio.play().catch(() => {});
+    }
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        audio.pause();
+      } else if (!isMuted) {
+        audio.play().catch(() => {});
+      }
+    };
+
+    const handleUnload = () => {
       audio.pause();
     };
-  }, []);
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("beforeunload", handleUnload);
+
+    return () => {
+      audio.pause();
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("beforeunload", handleUnload);
+    };
+  }, [isMuted]);
 
   const updateVolume = (nextVolume) => {
     const clamped = Math.max(0, Math.min(100, nextVolume));

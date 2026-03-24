@@ -21,6 +21,22 @@ from models.stats import AgentStats
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 
+# Singleton RL pour éviter de recharger la Q-table depuis le disque à chaque step
+_rl_agent: AgentQL | None = None
+
+
+def _get_rl_agent() -> AgentQL:
+    global _rl_agent
+    if _rl_agent is None:
+        _rl_agent = AgentQL(epsilon=EPSILON_MIN)
+    return _rl_agent
+
+
+def reset_rl_singleton() -> None:
+    """Force le rechargement de la Q-table au prochain step (à appeler après un entraînement)."""
+    global _rl_agent
+    _rl_agent = None
+
 
 class AgentStepRequest(BaseModel):
     """Requete pour faire avancer un agent d'un tick."""
@@ -33,6 +49,18 @@ class AgentInitRequest(BaseModel):
     """Requete pour initialiser un moteur de jeu pour un agent."""
 
     mode: str = "battle"
+
+
+class SaveGameRequest(BaseModel):
+    """Requete pour sauvegarder une partie de Battle Arena en base de données."""
+
+    agent_type: str
+    score: int
+    nb_steps: int
+    duration: float
+    cause_mort: str = ""
+    obstacles_actifs: bool = False
+    longueur_serpent: int = 1
 
 
 def _direction_from_name(name: str | None) -> Direction:
@@ -92,7 +120,7 @@ def _select_agent(agent_type: str) -> Any:
     if agent_type == "astar":
         return AgentAStar()
     if agent_type == "rl":
-        return AgentQL(epsilon=EPSILON_MIN)
+        return _get_rl_agent()
     raise HTTPException(status_code=400, detail=f"Agent type non supporte: {agent_type}")
 
 
@@ -178,6 +206,13 @@ def _save_agent_game(agent_type: str, score: int, nb_steps: int, duration: float
         db.commit()
     finally:
         db.close()
+
+
+@router.post("/save_game")
+def save_game_route(request: SaveGameRequest) -> dict:
+    """Sauvegarde une partie de Battle Arena en base de données."""
+    _save_agent_game(request.agent_type, request.score, request.nb_steps, request.duration)
+    return {"status": "saved"}
 
 
 @router.post("/init")

@@ -3,16 +3,12 @@ import { api } from "../services/api";
 
 // Thunks pour récupérer les stats côté backend
 export const fetchComparison = createAsyncThunk("stats/fetchComparison", async () => {
-  console.log("📡 Appel API /api/stats/comparison...");
   const res = await api.get("/api/stats/comparison");
-  console.log("📥 Données comparison reçues:", res);
   return res;
 });
 
 export const fetchHistory = createAsyncThunk("stats/fetchHistory", async () => {
-  console.log("📡 Appel API /api/stats/history...");
   const res = await api.get("/api/stats/history");
-  console.log("📥 Données history reçues:", res.length, "parties");
   return res;
 });
 

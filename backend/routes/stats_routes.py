@@ -76,7 +76,7 @@ def stats_history(db: Session = Depends(get_db)) -> List[dict]:
     games = (
         db.query(Game, Agent)
         .join(Agent, Game.agent_id == Agent.id)
-        .order_by(Game.created_at.desc())
+        .order_by(Game.created_at.asc())
         .limit(200)
         .all()
     )
@@ -90,8 +90,7 @@ def stats_history(db: Session = Depends(get_db)) -> List[dict]:
                 "score": game.score,
                 "nb_steps": game.nb_steps,
                 "duration": game.duration,
-                "created_at": game.created_at.isoformat(),
+                "created_at": game.created_at.isoformat() + "Z",
             }
         )
-    history.reverse()
     return history

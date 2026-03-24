@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
 
-const CELL_SIZE_MANUAL = 31;
-const CELL_SIZE_AI = 24;
+const CELL_SIZE_MANUAL = 30;
+const CELL_SIZE_AI = 30;
 
 function drawFood(ctx, x, y, cellSize) {
   const centerX = x * cellSize + cellSize / 2;
@@ -64,11 +64,13 @@ function drawSegment(ctx, x, y, cellSize, isHead) {
 }
 
 function Snake() {
-  const canvasRef = useRef(null);
-  const { snake, food, obstacles, gridSize, mode } = useSelector((state) => state.game);
+  const bgCanvasRef = useRef(null);
+  const entityCanvasRef = useRef(null);
+  const { snake, food, obstacles, dynamicObstacles, gridSize, mode } = useSelector((state) => state.game);
 
+  // Couche 1 : fond + grille + obstacles statiques (se redessine rarement)
   useEffect(() => {
-    const canvas = canvasRef.current;
+    const canvas = bgCanvasRef.current;
     if (!canvas) return;
 
     const cellSize = mode === "manual" ? CELL_SIZE_MANUAL : CELL_SIZE_AI;
@@ -110,6 +112,30 @@ function Snake() {
       ctx.roundRect(left, top, sizePx, sizePx, Math.max(5, cellSize * 0.18));
       ctx.fill();
     });
+  }, [gridSize, obstacles, mode]);
+
+  // Couche 2 : obstacles dynamiques + nourriture + serpent (se redessine à chaque tick)
+  useEffect(() => {
+    const canvas = entityCanvasRef.current;
+    if (!canvas) return;
+
+    const cellSize = mode === "manual" ? CELL_SIZE_MANUAL : CELL_SIZE_AI;
+    const ctx = canvas.getContext("2d");
+    const size = gridSize * cellSize;
+    canvas.width = size;
+    canvas.height = size;
+
+    ctx.clearRect(0, 0, size, size);
+
+    dynamicObstacles.forEach(({ x, y }) => {
+      const left = x * cellSize + 3;
+      const top = y * cellSize + 3;
+      const sizePx = cellSize - 6;
+      ctx.fillStyle = "#94a3b8";
+      ctx.beginPath();
+      ctx.roundRect(left, top, sizePx, sizePx, Math.max(4, cellSize * 0.14));
+      ctx.fill();
+    });
 
     if (food) {
       drawFood(ctx, food.x, food.y, cellSize);
@@ -118,18 +144,29 @@ function Snake() {
     snake.forEach(({ x, y }, index) => {
       drawSegment(ctx, x, y, cellSize, index === 0);
     });
-  }, [snake, food, obstacles, gridSize, mode]);
+  }, [snake, food, dynamicObstacles, gridSize, mode]);
 
   const cellSize = mode === "manual" ? CELL_SIZE_MANUAL : CELL_SIZE_AI;
   const sizePx = gridSize * cellSize;
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={sizePx}
-      height={sizePx}
-      className="mx-auto rounded-[2rem] border border-slate-700/80 bg-slate-950 shadow-[0_24px_70px_rgba(15,23,42,0.55)]"
-    />
+    <div
+      className="relative mx-auto rounded-[2rem] border border-slate-700/80 shadow-[0_24px_70px_rgba(15,23,42,0.55)]"
+      style={{ width: sizePx, height: sizePx }}
+    >
+      <canvas
+        ref={bgCanvasRef}
+        width={sizePx}
+        height={sizePx}
+        className="absolute top-0 left-0 rounded-[2rem] bg-slate-950"
+      />
+      <canvas
+        ref={entityCanvasRef}
+        width={sizePx}
+        height={sizePx}
+        className="absolute top-0 left-0 rounded-[2rem]"
+      />
+    </div>
   );
 }
 

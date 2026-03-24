@@ -1,12 +1,15 @@
 // Service de gestion de la connexion WebSocket avec reconnexion automatique.
 
+const BACKOFF_BASE_MS = 1000;
+const BACKOFF_MAX_MS = 30000;
+
 class WSService {
   constructor() {
     this.ws = null;
     this.url = null;
-    this.reconnectDelay = 1000;
     this._shouldReconnect = true;
     this._reconnectTimeout = null;
+    this._retryCount = 0;
   }
 
   connect(url, onOpen, onMessage, onClose) {
@@ -30,6 +33,7 @@ class WSService {
     this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
+      this._retryCount = 0;
       if (onOpen) onOpen();
     };
 
@@ -44,16 +48,19 @@ class WSService {
 
     this.ws.onclose = () => {
       if (onClose) onClose();
+      const delay = Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * Math.pow(2, this._retryCount));
+      this._retryCount += 1;
       this._reconnectTimeout = setTimeout(() => {
         if (this.url && this._shouldReconnect) {
           this.connect(this.url, onOpen, onMessage, onClose);
         }
-      }, this.reconnectDelay);
+      }, delay);
     };
   }
 
   disconnect() {
     this._shouldReconnect = false;
+    this._retryCount = 0;
     if (this._reconnectTimeout) {
       clearTimeout(this._reconnectTimeout);
       this._reconnectTimeout = null;

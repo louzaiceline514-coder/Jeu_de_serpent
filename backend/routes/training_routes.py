@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from functools import partial
 from pathlib import Path
 from typing import Optional
 from statistics import mean
@@ -55,14 +57,15 @@ def _build_summary(scores: list[int]) -> dict:
 
 
 @router.post("/start")
-def start_training(payload: TrainingRequest) -> dict:
+async def start_training(payload: TrainingRequest) -> dict:
     """Lance un entraînement RL ou un benchmark A* en fonction du type d'agent."""
     global _astar_benchmark_scores
     episodes = min(payload.episodes, 100)  # Limite à 100 épisodes max pour éviter timeout
+    loop = asyncio.get_event_loop()
 
     if payload.agent_type == "rl":
         trainer = get_trainer()
-        trainer.entrainer(episodes, callback_progression=None)
+        await loop.run_in_executor(None, partial(trainer.entrainer, episodes, None))
         # Invalide le singleton RL de la BattleArena pour qu'il recharge la Q-table à jour
         from routes.agent_routes import reset_rl_singleton
         reset_rl_singleton()
@@ -75,23 +78,23 @@ def start_training(payload: TrainingRequest) -> dict:
         }
 
     # Benchmark A* : N parties jouées automatiquement
-    moteur = MoteurJeu()
-    agent_astar = AgentAStar()
-    scores: list[int] = []
+    def _run_astar_benchmark() -> list[int]:
+        moteur = MoteurJeu()
+        agent_astar = AgentAStar()
+        scores: list[int] = []
+        for _ in range(episodes):
+            moteur.reset(mode="astar")
+            steps = 0
+            max_steps = 500
+            while not moteur.game_over and steps < max_steps:
+                direction = agent_astar.choisir_action({"engine": moteur})
+                moteur.changer_direction(direction)
+                moteur.step()
+                steps += 1
+            scores.append(int(moteur.score))
+        return scores
 
-    for _ in range(episodes):
-        moteur.reset(mode="astar")
-        steps = 0
-        max_steps = 500  # Limite de steps pour éviter boucles infinies
-
-        while not moteur.game_over and steps < max_steps:
-            direction = agent_astar.choisir_action({"engine": moteur})
-            moteur.changer_direction(direction)
-            moteur.step()
-            steps += 1
-
-        scores.append(int(moteur.score))
-
+    scores = await loop.run_in_executor(None, _run_astar_benchmark)
     _astar_benchmark_scores = list(scores)
 
     return {

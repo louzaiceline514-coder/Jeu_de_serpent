@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { setMode } from "../store/gameSlice";
 import { wsService } from "../services/websocket";
+import { api } from "../services/api";
 
 // Panneau de contrôle des modes et de la partie.
 
@@ -12,6 +13,13 @@ function ControlPanel() {
   const [paused, setPaused] = useState(true);
   const [speed, setSpeed] = useState(150);
   const [started, setStarted] = useState(false);
+  const [bestScore, setBestScore] = useState(0);
+
+  useEffect(() => {
+    api.get("/api/stats/comparison")
+      .then((data) => setBestScore(data[mode]?.best_score || 0))
+      .catch(() => {});
+  }, [mode, gameOver]);
 
   const changeMode = (newMode) => {
     dispatch(setMode(newMode));
@@ -21,6 +29,10 @@ function ControlPanel() {
   };
 
   const handleStart = () => {
+    if (started && !paused) {
+      // Partie en cours → reset puis relance
+      wsService.send("reset", {});
+    }
     wsService.send("start", {});
     setPaused(false);
     setStarted(true);
@@ -39,7 +51,8 @@ function ControlPanel() {
   };
 
   const handleSpeedChange = (e) => {
-    const value = parseInt(e.target.value, 10) || 150;
+    const value = parseInt(e.target.value, 10);
+    if (isNaN(value)) return;
     setSpeed(value);
     wsService.send("set_speed", { speed: value });
   };
@@ -82,6 +95,7 @@ function ControlPanel() {
 
       <div className="flex items-center justify-between text-sm text-slate-200">
         <span>Score : {score}</span>
+        <span className="text-xs text-amber-300">Best : {bestScore}</span>
         {gameOver && <span className="text-red-400 text-xs">Game Over</span>}
       </div>
 

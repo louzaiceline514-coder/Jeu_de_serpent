@@ -4,13 +4,14 @@ import ControlPanel from "./components/ControlPanel";
 import Dashboard from "./components/Dashboard";
 import StatsComparison from "./components/StatsComparison";
 import BattleArena from "./components/BattleArena";
+import TrainingPanel from "./components/TrainingPanel";
 import AmbientAudioControls from "./components/AmbientAudioControls";
 import useWebSocket from "./hooks/useWebSocket";
 import useKeyboard from "./hooks/useKeyboard";
 
 function App() {
   const [hasEntered, setHasEntered] = useState(false);
-  const [view, setView] = useState("game"); // "game" | "battle" | "stats"
+  const [view, setView] = useState("game"); // "game" | "battle" | "stats" | "training"
   useWebSocket(hasEntered);
   useKeyboard(hasEntered);
 
@@ -92,13 +93,23 @@ function App() {
             >
               Analyse
             </button>
+            <button
+              onClick={() => setView("training")}
+              className={`px-3 py-1 rounded text-sm ${
+                view === "training"
+                  ? "bg-violet-400 text-slate-950"
+                  : "bg-slate-900/80 text-slate-200 border border-slate-800"
+              }`}
+            >
+              Entraînement
+            </button>
           </nav>
           <AmbientAudioControls />
         </div>
       </header>
 
       {view === "game" ? (
-        <main className="flex-1 grid grid-cols-1 xl:grid-cols-[minmax(0,2.6fr)_minmax(380px,1fr)] gap-5 p-5 items-stretch">
+        <main className="flex-1 grid grid-cols-[minmax(0,1fr)_320px] gap-5 p-5 items-stretch">
           <section className="h-full">
             <div className="bg-slate-950/65 border border-slate-800 rounded-[2rem] p-5 flex flex-col min-h-[80vh] h-full shadow-[0_20px_80px_rgba(2,6,23,0.45)]">
               <GameGrid />
@@ -121,6 +132,12 @@ function App() {
         <main className="flex-1 p-5">
           <section className="bg-slate-950/65 border border-slate-800 rounded-[2rem] p-5 shadow-[0_20px_80px_rgba(2,6,23,0.45)]">
             <StatsComparison />
+          </section>
+        </main>
+      ) : view === "training" ? (
+        <main className="flex-1 p-5">
+          <section className="bg-slate-950/65 border border-slate-800 rounded-[2rem] p-5 shadow-[0_20px_80px_rgba(2,6,23,0.45)]">
+            <TrainingPanel />
           </section>
         </main>
       ) : null}

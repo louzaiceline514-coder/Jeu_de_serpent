@@ -5,6 +5,7 @@ const initialState = {
   snake: [],
   food: null,
   obstacles: [],
+  dynamicObstacles: [],
   score: 0,
   mode: "manual", // manual | astar | rl
   gameOver: false,
@@ -22,6 +23,7 @@ const gameSlice = createSlice({
       state.snake = payload.snake || [];
       state.food = payload.food || null;
       state.obstacles = payload.obstacles || [];
+      state.dynamicObstacles = payload.dynamic_obstacles || [];
       state.score = payload.score ?? 0;
       state.gameOver = payload.game_over ?? false;
       state.mode = payload.mode || state.mode;

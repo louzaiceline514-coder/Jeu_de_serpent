@@ -1,10 +1,11 @@
 """Configuration globale du backend Snake AI."""
 
+import os
 from pathlib import Path
 from typing import Dict, List
 
 # Taille de la grille (carrée)
-GRID_SIZE: int = 20
+GRID_SIZE: int = int(os.getenv("GRID_SIZE", "20"))
 
 # Base directory du projet
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,7 +28,7 @@ CORS_ORIGINS: List[str] = [
 ]
 
 # Paramètres du moteur de jeu
-TICK_INTERVAL_MS: int = 150
+TICK_INTERVAL_MS: int = int(os.getenv("TICK_INTERVAL_MS", "150"))
 
 OBSTACLE_SETTINGS: Dict[str, Dict[str, int]] = {
     "manual": {
@@ -63,11 +64,11 @@ OBSTACLE_SETTINGS: Dict[str, Dict[str, int]] = {
 }
 
 # Paramètres du Q-Learning
-ALPHA: float = 0.1  # taux d'apprentissage
-GAMMA: float = 0.9  # facteur de réduction
-EPSILON_START: float = 1.0
-EPSILON_MIN: float = 0.01
-EPSILON_DECAY: float = 0.995
+ALPHA: float = float(os.getenv("RL_ALPHA", "0.1"))          # taux d'apprentissage
+GAMMA: float = float(os.getenv("RL_GAMMA", "0.9"))          # facteur de réduction
+EPSILON_START: float = float(os.getenv("RL_EPSILON_START", "1.0"))
+EPSILON_MIN: float = float(os.getenv("RL_EPSILON_MIN", "0.01"))
+EPSILON_DECAY: float = float(os.getenv("RL_EPSILON_DECAY", "0.995"))
 
 # Fichier de sauvegarde de la Q-table
 QTABLE_PATH = BASE_DIR / "qtable.json"
