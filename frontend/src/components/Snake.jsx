@@ -145,11 +145,11 @@ function Snake() {
 
     ctx.clearRect(0, 0, size, size);
 
-    // --- Overlay chemin A* (F6) — affiché uniquement en mode astar ---
+    // --- Overlay chemin A* — bleu #3B82F6 (charte : accent primaire A*) ---
     if (mode === "astar" && astarPath && astarPath.length > 0) {
       astarPath.forEach(({ x, y }, index) => {
         const alpha = 0.45 - (index / astarPath.length) * 0.35; // fondu progressif
-        ctx.fillStyle = `rgba(251, 191, 36, ${alpha.toFixed(2)})`; // ambre semi-transparent
+        ctx.fillStyle = `rgba(59, 130, 246, ${alpha.toFixed(2)})`; // bleu Blue-500 charte
         const pad = Math.floor(cellSize * 0.22);
         ctx.beginPath();
         ctx.roundRect(
@@ -163,11 +163,11 @@ function Snake() {
       });
     }
 
-    // --- Overlay chemin Q-Learning — affiché uniquement en mode rl ---
+    // --- Overlay chemin Q-Learning — violet #8B5CF6 (charte : accent secondaire RL) ---
     if (mode === "rl" && rlPath && rlPath.length > 0) {
       rlPath.forEach(({ x, y }, index) => {
         const alpha = 0.45 - (index / rlPath.length) * 0.35; // fondu progressif (identique à A*)
-        ctx.fillStyle = `rgba(167, 139, 250, ${alpha.toFixed(2)})`; // violet semi-transparent
+        ctx.fillStyle = `rgba(139, 92, 246, ${alpha.toFixed(2)})`; // violet Violet-500 charte
         const pad = Math.floor(cellSize * 0.22);
         ctx.beginPath();
         ctx.roundRect(

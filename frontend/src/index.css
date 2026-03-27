@@ -7,16 +7,28 @@ html {
 }
 
 body {
-  @apply bg-slate-950 text-slate-100;
-  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  @apply bg-slate-900 text-slate-100;
+  /* Charte graphique : Inter pour le texte courant */
+  font-family: "Inter", "Segoe UI", sans-serif;
   min-height: 100vh;
+}
+
+h1, h2, h3, h4 {
+  /* Charte graphique : Poppins pour les titres */
+  font-family: "Poppins", "Inter", sans-serif;
+}
+
+code, pre, .font-mono {
+  /* Charte graphique : JetBrains Mono pour code/stats */
+  font-family: "JetBrains Mono", "Fira Code", monospace;
 }
 
 #root {
   min-height: 100vh;
 }
 
+/* Charte graphique : sélection en bleu (A* primary accent) */
 ::selection {
-  background: rgba(16, 185, 129, 0.32);
-  color: #f8fafc;
+  background: rgba(59, 130, 246, 0.32);
+  color: #f1f5f9;
 }

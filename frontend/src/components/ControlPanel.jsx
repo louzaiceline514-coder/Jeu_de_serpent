@@ -58,34 +58,42 @@ function ControlPanel() {
     wsService.send("set_speed", { speed: value });
   };
 
+  // Charte graphique : couleur active selon le mode
+  const modeColor = {
+    manual:  "bg-emerald-500 text-white border-emerald-400",   // Emerald = Joueur
+    astar:   "bg-blue-500 text-white border-blue-400",          // Blue    = A*
+    rl:      "bg-violet-500 text-white border-violet-400",      // Violet  = RL
+    random:  "bg-amber-500 text-white border-amber-400",        // Amber   = Aléatoire
+  };
+
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 h-full">
+    <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 space-y-3 h-full">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-slate-200">Contrôles</span>
+        <span className="text-sm font-semibold text-slate-100">Contrôles</span>
         <span
-          className={`text-xs px-2 py-1 rounded-full ${
+          className={`text-xs px-2 py-1 rounded-full font-mono ${
             connected ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"
           }`}
         >
-          {connected ? "Connecté au backend" : "Déconnecté"}
+          {connected ? "Connecté" : "Déconnecté"}
         </span>
       </div>
 
       <div className="space-y-2">
-        <p className="text-xs text-slate-400">Mode de jeu</p>
+        <p className="text-xs text-slate-400 uppercase tracking-wide">Mode de jeu</p>
         <div className="flex gap-2">
           {[
             { key: "manual", label: "Manuel" },
-            { key: "astar", label: "A*" },
-            { key: "rl", label: "Q-Learning" }
+            { key: "astar",  label: "A*" },
+            { key: "rl",     label: "Q-Learning" }
           ].map((m) => (
             <button
               key={m.key}
               onClick={() => changeMode(m.key)}
-              className={`flex-1 px-2 py-1 text-xs rounded border ${
+              className={`flex-1 px-2 py-1 text-xs rounded border font-medium ${
                 mode === m.key
-                  ? "bg-emerald-500 text-slate-900 border-emerald-400"
-                  : "bg-slate-800 text-slate-200 border-slate-700"
+                  ? modeColor[m.key]
+                  : "bg-slate-700 text-slate-300 border-slate-600 hover:border-slate-500"
               }`}
             >
               {m.label}
@@ -95,16 +103,17 @@ function ControlPanel() {
       </div>
 
       <div className="flex items-center justify-between text-sm text-slate-200">
-        <span>Score : {score}</span>
-        <span className="text-xs text-amber-300">Best : {bestScore}</span>
-        {gameOver && <span className="text-red-400 text-xs">Game Over</span>}
+        {/* Charte : font-mono pour les stats */}
+        <span className="font-mono">Score : <span className="text-emerald-400 font-semibold">{score}</span></span>
+        <span className="text-xs font-mono text-amber-400">Best : {bestScore}</span>
+        {gameOver && <span className="text-red-400 text-xs font-medium">Game Over</span>}
       </div>
 
       <div className="space-y-3">
         <div className="flex gap-2">
           <button
             onClick={handleStart}
-            className="flex-1 px-3 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-sm text-slate-950 font-semibold border border-emerald-300"
+            className="flex-1 px-3 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-sm text-white font-semibold border border-emerald-400"
           >
             {!started ? "Start" : paused ? "Reprendre" : "Redémarrer"}
           </button>
