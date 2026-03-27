@@ -1,5 +1,5 @@
 """Tests des classes du diagramme de conception : Nourriture, Obstacle,
-CollecteurStatistiques et ControleurJeu."""
+CollecteurStatistiques, ControleurJeu, TypeCellule, EtatJeu et AgentAleatoire."""
 
 import pytest
 
@@ -8,6 +8,10 @@ from game_engine.obstacle import Obstacle
 from game_engine.collecteur_statistiques import CollecteurStatistiques
 from game_engine.controleur_jeu import ControleurJeu
 from game_engine.direction import Direction
+from game_engine.type_cellule import TypeCellule
+from game_engine.etat_jeu import EtatJeu
+from agents.agent_aleatoire import AgentAleatoire
+from game_engine.moteur import MoteurJeu
 
 
 # ---------------------------------------------------------------------------
@@ -229,3 +233,159 @@ class TestControleurJeu:
             ctrl.step()
             ctrl.reset(mode="manual")
         assert ctrl.collecteur.nb_parties == 3
+
+
+# ---------------------------------------------------------------------------
+# TypeCellule
+# ---------------------------------------------------------------------------
+
+class TestTypeCellule:
+    def test_valeurs_entiers(self):
+        assert TypeCellule.VIDE == 0
+        assert TypeCellule.SERPENT == 1
+        assert TypeCellule.NOURRITURE == 2
+        assert TypeCellule.OBSTACLE == 3
+
+    def test_isinstance_int(self):
+        """TypeCellule est un IntEnum : compatible avec les tableaux NumPy uint8."""
+        assert isinstance(TypeCellule.VIDE, int)
+        assert isinstance(TypeCellule.OBSTACLE, int)
+
+    def test_egalite_avec_entier(self):
+        assert TypeCellule.SERPENT == 1
+        assert TypeCellule.NOURRITURE == 2
+
+    def test_tous_membres_presents(self):
+        noms = {m.name for m in TypeCellule}
+        assert noms == {"VIDE", "SERPENT", "NOURRITURE", "OBSTACLE"}
+
+    def test_utilise_dans_grille_numpy(self):
+        """to_numpy_grid utilise TypeCellule → valeurs cohérentes."""
+        from game_engine.grille import Grille
+        g = Grille(5, 5)
+        g.obstacles = {(0, 0)}
+        g.nourriture = (4, 4)
+        corps = [(2, 2)]
+        grid = g.to_numpy_grid(corps)
+        assert grid[0, 0] == TypeCellule.OBSTACLE
+        assert grid[4, 4] == TypeCellule.NOURRITURE
+        assert grid[2, 2] == TypeCellule.SERPENT
+        assert grid[1, 1] == TypeCellule.VIDE
+
+
+# ---------------------------------------------------------------------------
+# EtatJeu
+# ---------------------------------------------------------------------------
+
+class TestEtatJeu:
+    def test_valeurs_str(self):
+        assert EtatJeu.EN_COURS == "en_cours"
+        assert EtatJeu.GAME_OVER == "game_over"
+        assert EtatJeu.PAUSE == "pause"
+
+    def test_isinstance_str(self):
+        """EtatJeu est un str Enum : sérialisable JSON sans convertisseur."""
+        assert isinstance(EtatJeu.EN_COURS, str)
+
+    def test_tous_membres_presents(self):
+        noms = {m.name for m in EtatJeu}
+        assert noms == {"EN_COURS", "GAME_OVER", "PAUSE"}
+
+    def test_moteur_etat_initial(self):
+        """MoteurJeu.etat retourne EN_COURS après reset."""
+        m = MoteurJeu()
+        m.reset(mode="manual")
+        assert m.etat == EtatJeu.EN_COURS
+
+    def test_moteur_etat_game_over(self):
+        """MoteurJeu.etat retourne GAME_OVER après une collision."""
+        m = MoteurJeu()
+        m.reset(mode="performance")
+        m.serpent.corps = [(0, 0)]
+        m.serpent.direction = Direction.GAUCHE
+        m.grille.obstacles = set()
+        m.static_obstacles = set()
+        m.dynamic_obstacles = {}
+        m.step()
+        assert m.game_over
+        assert m.etat == EtatJeu.GAME_OVER
+
+    def test_etat_dans_state_dict(self):
+        """get_state_dict() inclut le champ 'etat' avec la valeur correcte."""
+        m = MoteurJeu()
+        m.reset(mode="manual")
+        state = m.get_state_dict()
+        assert "etat" in state
+        assert state["etat"] == EtatJeu.EN_COURS
+
+
+# ---------------------------------------------------------------------------
+# AgentAleatoire
+# ---------------------------------------------------------------------------
+
+class TestAgentAleatoire:
+    def test_nom_agent(self):
+        agent = AgentAleatoire()
+        assert "léatoire" in agent.name or "leatoire" in agent.name.lower()
+
+    def test_choisir_action_retourne_direction(self):
+        agent = AgentAleatoire()
+        moteur = MoteurJeu()
+        moteur.reset(mode="performance")
+        direction = agent.choisir_action({"engine": moteur})
+        assert direction in list(Direction)
+
+    def test_ne_fait_pas_demi_tour_sauf_necessity(self):
+        """L'agent ne choisit pas la direction opposée quand une autre est libre."""
+        agent = AgentAleatoire()
+        moteur = MoteurJeu()
+        moteur.reset(mode="performance")
+        # Place le serpent au centre avec beaucoup d'espace
+        moteur.serpent.corps = [(12, 12)]
+        moteur.serpent.direction = Direction.DROITE
+        moteur.grille.obstacles = set()
+        # Effectue 20 choix et vérifie qu'on ne fait jamais demi-tour quand inutile
+        for _ in range(20):
+            d = agent.choisir_action({"engine": moteur})
+            assert d != Direction.GAUCHE, "Ne devrait pas faire demi-tour (DROITE → GAUCHE)"
+
+    def test_survie_dans_cul_de_sac(self):
+        """En cul-de-sac, l'agent retourne une direction sans planter."""
+        agent = AgentAleatoire()
+        moteur = MoteurJeu()
+        moteur.reset(mode="performance")
+        # Entourer la tête d'obstacles sauf la direction actuelle
+        moteur.serpent.corps = [(12, 12)]
+        moteur.serpent.direction = Direction.DROITE
+        moteur.grille.obstacles = {(12, 11), (12, 13), (11, 12)}  # haut/bas/gauche bloqués
+        direction = agent.choisir_action({"engine": moteur})
+        assert direction in list(Direction)  # ne plante pas
+
+    def test_agent_aleatoire_ne_marche_pas_dans_mur(self):
+        """Dans un espace ouvert, l'agent ne choisit jamais une case hors grille."""
+        from config import GRID_SIZE
+        agent = AgentAleatoire()
+        moteur = MoteurJeu()
+        moteur.reset(mode="performance")
+        moteur.serpent.corps = [(GRID_SIZE - 1, 12)]
+        moteur.serpent.direction = Direction.DROITE
+        moteur.grille.obstacles = set()
+        # À droite → hors grille, l'agent doit choisir ailleurs
+        for _ in range(20):
+            d = agent.choisir_action({"engine": moteur})
+            # DROITE serait hors grille, ne doit pas être choisi si une autre option existe
+            if d == Direction.DROITE:
+                # Acceptable uniquement si toutes les autres sont aussi bloquées
+                nx = moteur.serpent.tete[0] + d.dx
+                safe_others = [
+                    dd for dd in Direction
+                    if dd != Direction.GAUCHE
+                    and moteur.grille.est_dans_grille(
+                        moteur.serpent.tete[0] + dd.dx,
+                        moteur.serpent.tete[1] + dd.dy
+                    )
+                    and (moteur.serpent.tete[0] + dd.dx, moteur.serpent.tete[1] + dd.dy)
+                    not in moteur.grille.obstacles
+                ]
+                # Si d'autres options sûres existaient, l'agent n'aurait pas dû choisir DROITE
+                assert len(safe_others) <= 1  # seul DROITE était "sûr" ou pas d'option
