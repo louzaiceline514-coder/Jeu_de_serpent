@@ -119,7 +119,7 @@ function App() {
       {view === "game" ? (
         <main className="flex-1 grid grid-cols-[minmax(0,1fr)_320px] gap-5 p-5 items-stretch">
           <section className="h-full">
-            <div className="bg-slate-950/65 border border-slate-800 rounded-[2rem] p-5 flex flex-col min-h-[80vh] h-full shadow-[0_20px_80px_rgba(2,6,23,0.45)]">
+            <div className="bg-slate-900/80 border border-slate-700 rounded-[2rem] p-5 flex flex-col min-h-[80vh] h-full shadow-[0_20px_80px_rgba(2,6,23,0.45)]">
               <GameGrid />
             </div>
           </section>
