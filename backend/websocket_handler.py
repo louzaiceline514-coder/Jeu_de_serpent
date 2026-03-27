@@ -124,10 +124,12 @@ class GameWebSocketManager:
                     state_dict["astar_path"] = [
                         {"x": x, "y": y} for (x, y) in self.agent_astar.last_path
                     ]
-                elif self.engine.mode == "rl":
-                    state_dict["rl_path"] = [
-                        {"x": x, "y": y} for (x, y) in self.agent_rl.last_path
-                    ]
+                elif self.engine.mode == "rl" and not self.engine.game_over:
+                    # Toujours afficher le chemin : last_path après un move, sinon simulation depuis direction actuelle
+                    rl_path_coords = self.agent_rl.last_path or self.agent_rl._simulate_greedy_path(
+                        self.engine, self.engine.serpent.direction
+                    )
+                    state_dict["rl_path"] = [{"x": x, "y": y} for (x, y) in rl_path_coords]
 
                 # Envoi : complet sur premier frame, delta sur les suivants
                 if not self._static_sent:

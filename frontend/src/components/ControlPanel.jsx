@@ -8,11 +8,12 @@ import { api } from "../services/api";
 
 function ControlPanel() {
   const dispatch = useDispatch();
-  const { mode, score, gameOver } = useSelector((state) => state.game);
+  const { mode, score, gameOver, stepCount } = useSelector((state) => state.game);
   const { connected } = useSelector((state) => state.ws);
   const [paused, setPaused] = useState(true);
   const [speed, setSpeed] = useState(150);
-  const [started, setStarted] = useState(false);
+  // Initialiser started depuis le stepCount Redux pour survivre à la navigation entre vues
+  const [started, setStarted] = useState(() => stepCount > 0 || gameOver);
   const [bestScore, setBestScore] = useState(0);
 
   useEffect(() => {
@@ -115,7 +116,7 @@ function ControlPanel() {
           </button>
           <button
             onClick={handlePauseToggle}
-            disabled={!started}
+            disabled={gameOver}
             className="flex-1 px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sm text-slate-100 border border-slate-700 disabled:opacity-50"
           >
             {paused ? "Reprendre" : "Pause"}
