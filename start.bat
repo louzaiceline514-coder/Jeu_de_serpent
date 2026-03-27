@@ -46,7 +46,7 @@ REM ─────────────────────────�
 REM  Installation des dependances Python
 REM ─────────────────────────────────────────────
 echo [1/4] Installation des dependances Python (pip)...
-python -m pip install -r "%~dp0requirements.txt" --quiet --disable-pip-version-check
+python -m pip install -r "%~dp0backend\requirements.txt" --quiet --disable-pip-version-check
 if %errorlevel% neq 0 (
     echo  ERREUR : L'installation pip a echoue.
     echo  Essayez manuellement : pip install -r requirements.txt

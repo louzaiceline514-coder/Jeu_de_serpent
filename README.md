@@ -1,8 +1,8 @@
 # Snake AI – SAE4 · Licence 3 Informatique UPJV
 
 Application web complète autour du jeu du serpent (Snake Game), comparant deux agents IA :
-- **A\*** : pathfinding optimal avec heuristique de Manhattan + flood fill
-- **Q-Learning** : apprentissage par renforcement tabulaire (Q-table, 11 features)
+- **A\*** : pathfinding optimal avec heuristique de Manhattan + flood fill + tail-chasing
+- **Q-Learning** : apprentissage par renforcement tabulaire (Q-table JSON, 11 features NumPy)
 
 Le mode Manuel permet de jouer soi-même au clavier.
 
@@ -37,9 +37,10 @@ Frontend (React 18 + Redux)  ←──WebSocket / REST──→  Backend (FastAP
 ```
 
 - **Frontend** : Single Page Application React 18 avec Redux Toolkit pour l'état global.
-- **Backend** : FastAPI avec support WebSocket natif (async/await).
-- **IA** : Agent A* (min-heap, heuristique Manhattan) et Agent Q-Learning (Q-table JSON, 11 features NumPy).
+- **Backend** : FastAPI avec support WebSocket natif (async/await) + sérialisation orjson.
+- **IA** : Agent A* (min-heap, heuristique Manhattan, flood fill, tail-chasing) et Agent Q-Learning (Q-table JSON, 11 features NumPy uint8).
 - **Base de données** : SQLite via SQLAlchemy (5 tables : agents, games, game_events, agent_stats, rl_training).
+- **Rendu** : Canvas HTML5 bi-couche (fond statique + entités dynamiques) pour des performances optimales.
 
 ---
 
@@ -77,7 +78,12 @@ npm install
 
 ### Lancement automatique (recommandé)
 
-Double-cliquez sur **`start.bat`** à la racine du projet.  
+| Système | Action |
+|---|---|
+| **Windows** | Double-cliquez sur **`start.bat`** à la racine |
+| **Linux** | `./start.sh` dans un terminal |
+| **macOS** | Double-cliquez sur **`start.command`** depuis le Finder |
+
 Le script démarre le backend, le frontend, et ouvre automatiquement le navigateur sur **`http://localhost:5174`**.
 
 ### Lancement manuel
@@ -91,6 +97,7 @@ uvicorn main:app --reload --port 8000
 ```
 
 Le backend est disponible sur `http://localhost:8000`.
+Swagger UI : `http://localhost:8000/docs`
 La base de données `snake.db` est créée automatiquement à la racine du projet.
 
 **Terminal 2 – Frontend :**
@@ -101,7 +108,7 @@ npm run dev
 
 L'application est accessible sur **`http://localhost:5174`**.
 
-> Si vous avez déjà une base `snake.db` d'une version précédente, supprimez-la avant de relancer le backend afin que les nouvelles tables (game_events, rl_training) soient créées.
+> Si vous avez déjà une base `snake.db` d'une version précédente, supprimez-la avant de relancer le backend afin que les nouvelles tables soient créées correctement.
 
 ---
 
@@ -110,13 +117,13 @@ L'application est accessible sur **`http://localhost:5174`**.
 ### Écran d'accueil
 
 Au premier lancement, un écran de présentation s'affiche avec les trois modes disponibles.
-Cliquez sur **Start** pour entrer dans l'application.
+Cliquez sur **Lancer en mode [X]** pour entrer dans l'application.
 
 ---
 
 ### Mode Jeu
 
-Vue principale accessible via le bouton **Jeu** dans la barre de navigation.
+Vue principale accessible via le bouton **Jouer** dans la barre de navigation.
 
 **Panneau de contrôle (à droite) :**
 
@@ -128,32 +135,31 @@ Vue principale accessible via le bouton **Jeu** dans la barre de navigation.
 | **Bouton Reset** | Réinitialise la partie dans le mode courant |
 | **Curseur de vitesse** | Ajuste la vitesse de tick (50 ms → rapide, 500 ms → lent) |
 
-**Dashboard (en bas à droite) :**
-Affiche en temps réel : score, nombre de steps, mode actif, état de la partie (En cours / Terminé).
-
 **Grille de jeu :**
-- Serpent en vert
-- Nourriture en rouge
-- Obstacles statiques en gris foncé
-- Obstacles dynamiques en orange (ils apparaissent et disparaissent)
+
+| Élément | Couleur |
+|---|---|
+| Serpent (tête) | Vert vif avec yeux |
+| Serpent (corps) | Vert avec dégradé |
+| Nourriture | Rouge avec tige verte |
+| Obstacles statiques | Gris foncé |
+| Obstacles dynamiques | Gris clair |
+| Chemin A* planifié | Bleu semi-transparent |
+| Décisions Q-Learning | Violet semi-transparent |
 
 ---
 
 ### Mode A\* vs Q-Learning (Battle Arena)
 
-Accessible via le bouton **A\* vs Q-Learning**.
+Accessible via le bouton **A\* vs QL**.
 
-Ce mode lance **simultanément** deux serpents IA indépendants sur la même grille :
-- Serpent vert : **Agent A\***
-- Serpent orange : **Agent Q-Learning**
+Ce mode lance **simultanément** deux serpents IA indépendants sur deux grilles :
 
-**Fonctionnement :**
-1. Cliquez **Lancer la simulation** pour démarrer les deux agents.
-2. Les graphiques en temps réel (BarChart, RadarChart) s'affichent à droite.
-3. Les statistiques live (score, steps, temps d'inférence, epsilon pour RL) sont mises à jour à chaque tick.
-4. En fin de simulation, un tableau comparatif et une **heatmap** résument les positions visitées par chaque agent.
+1. Cliquez **Start Battle** pour démarrer les deux agents.
+2. Les statistiques live (score, steps, latence d'inférence, epsilon RL) s'affichent en temps réel.
+3. Les graphiques BarChart et RadarChart comparent les performances.
 
-> Les deux agents jouent sur une grille **25×25** avec obstacles statiques et dynamiques activés.
+> Les deux agents jouent sur une grille **25×25** avec obstacles statiques et dynamiques.
 
 ---
 
@@ -161,24 +167,18 @@ Ce mode lance **simultanément** deux serpents IA indépendants sur la même gri
 
 Accessible via le bouton **Entrainement**.
 
-Permet de lancer un entraînement RL ou un benchmark A* :
-
 | Champ | Description |
 |---|---|
-| **Type d'agent** | RL (Q-Learning) ou A* (benchmark) |
-| **Nombre d'épisodes** | Nombre de parties à jouer (max 100 par requête) |
-| **Mode performance** | Désactive les obstacles pour accélérer l'entraînement |
-| **Bouton Lancer** | Démarre l'entraînement/benchmark côté serveur |
+| **Nombre d'épisodes** | Nombre de parties à jouer (max 100 par requête, défaut 80) |
+| **Mode performance** | Désactive les obstacles pour accélérer la convergence RL |
+| **Entrainer Q-Learning** | Lance l'entraînement RL côté serveur |
+| **Benchmarker A\*** | Lance le benchmark A* |
 
 **Résultats :**
 - Courbe des scores par épisode (LineChart)
-- Résumé : score moyen, meilleur score, taux de survie
-
-**Mode performance** : activez le toggle "Mode performance (sans obstacles)" pour entraîner le RL sur une grille vide. L'apprentissage converge plus vite, puis vous pouvez reprendre l'entraînement avec obstacles pour la robustesse.
+- Résumé : score moyen, meilleur score (MetricCards RL moyen / RL meilleur / A* moyen / A* meilleur)
 
 Pour le RL, la Q-table est sauvegardée automatiquement dans `qtable.json` à la racine du projet et rechargée à chaque démarrage du backend.
-
-Les données d'entraînement RL (épisode, score, epsilon, alpha) sont également persistées dans la table `rl_training` de la base de données.
 
 ---
 
@@ -188,20 +188,12 @@ Accessible via le bouton **Stats**.
 
 Affiche la comparaison des performances entre A* et Q-Learning basée sur les parties réellement enregistrées en base de données :
 
-- **Score moyen** et **score médian** par agent
-- **Meilleur score** par agent
-- **Taux de survie** (proportion de parties avec score > 0)
-- **Nombre de parties jouées**
-- **Historique des parties** (tableau des 200 dernières parties IA) avec bouton **replay** (▶) par ligne
+- **Score moyen**, **meilleur score**, **taux de survie**, **nombre de parties jouées**
+- **Historique des parties** (tableau des 200 dernières parties IA)
 
 **Exports disponibles :**
 - **CSV** : export brut de l'historique
 - **JSON** : export structuré complet
-- **PDF** : rapport formaté (via jsPDF)
-
-**Replay** : cliquez ▶ sur une partie pour la rejouer frame par frame dans un player dédié (lecture, pause, seek, vitesse ×0.5/×1/×2).
-
-Les données sont récupérées depuis les routes `/api/stats/comparison`, `/api/stats/history` et `/api/stats/replay/{game_id}`.
 
 ---
 
@@ -223,30 +215,26 @@ Les données sont récupérées depuis les routes `/api/stats/comparison`, `/api
 
 ### Tests backend (pytest)
 
-Depuis le dossier `backend/` :
+Depuis la **racine du projet** :
 
 ```bash
-cd backend
 python -m pytest tests/ -v
 ```
 
-Ou depuis la racine du projet :
+Couverture (107 tests) :
 
-```bash
-pytest tests/ -v
-```
-
-Couverture :
-- `test_serpent.py` : déplacement, croissance, collisions, demi-tour
-- `test_grille.py` : génération nourriture/obstacles, voisins, NumPy grid
-- `test_moteur.py` : cycle de jeu, step, reset, cause_mort
-- `test_astar.py` : chemin simple, heuristique Manhattan, obstacles, fallback survie
-- `test_rl.py` : encodage état (11 features), mise à jour Q-table, équation de Bellman, décroissance epsilon, sauvegarde/chargement Q-table
-- `test_classes_diagramme.py` : Nourriture, Obstacle, CollecteurStatistiques, ControleurJeu, TypeCellule, EtatJeu, AgentAleatoire
-- `test_functional.py` : sessions complètes A*, RL et humain (E2E sans DB)
-- `test_integration.py` : persistance SQLite, flux agent-moteur, latences A* et RL
-- `test_api.py` : routes REST /api/health, /api/game, /api/stats, /api/agents
-- `test_websocket.py` : connexion WebSocket, messages binaires orjson, deltas game_delta, champs etat/astar_path
+| Fichier | Tests |
+|---|---|
+| `test_serpent.py` | Déplacement, croissance, collisions, demi-tour |
+| `test_grille.py` | Génération nourriture/obstacles, voisins, NumPy grid |
+| `test_moteur.py` | Cycle de jeu, step, reset, cause_mort |
+| `test_astar.py` | Chemin simple, heuristique Manhattan, obstacles, fallback survie |
+| `test_rl.py` | Encodage état (11 features), mise à jour Q-table, équation de Bellman, décroissance epsilon |
+| `test_classes_diagramme.py` | Nourriture, Obstacle, CollecteurStatistiques, ControleurJeu, TypeCellule, EtatJeu, AgentAleatoire (39 tests) |
+| `test_functional.py` | Sessions complètes A*, RL et humain (E2E sans DB) |
+| `test_integration.py` | Persistance SQLite, flux agent-moteur, latences A* et RL |
+| `test_api.py` | Routes REST /api/health, /api/game, /api/stats, /api/agents |
+| `test_websocket.py` | Connexion WebSocket, messages binaires orjson, deltas game_delta |
 
 **Total : 107 tests pytest (tous verts)**
 
@@ -257,10 +245,13 @@ cd frontend
 npm test
 ```
 
-Couverture :
-- `gameSlice.test.js` : réducteurs Redux pour l'état du jeu
-- `uiSlice.test.js` : réducteurs Redux pour l'interface (vitesse, audio, vue)
-- `Dashboard.test.jsx` : rendu du composant Dashboard avec différents états
+| Fichier | Couverture |
+|---|---|
+| `gameSlice.test.js` | Réducteurs Redux setGameState, applyDelta, setMode |
+| `uiSlice.test.js` | Réducteurs Redux vitesse, vue |
+| `Dashboard.test.jsx` | Rendu composant Dashboard avec différents états Redux |
+| `BattleArena.test.jsx` | Rendu, boutons Start/Pause/Reset, scores initiaux, reset |
+| `TrainingPanel.test.jsx` | Rendu, boutons, input épisodes, MetricCards, état Redux préchargé, toggle obstacles |
 
 ---
 
@@ -268,12 +259,14 @@ Couverture :
 
 ### Algorithme A\*
 
-1. Maintient une file de priorité (min-heap) avec le coût `f = g + h`.
+1. Maintient une file de priorité (min-heap `heapq`) avec le coût `f = g + h`.
 2. `g` = distance parcourue depuis la tête du serpent.
 3. `h` = distance de Manhattan vers la nourriture.
 4. Le corps du serpent et les obstacles sont des cases interdites.
-5. **Stratégie de survie** : si aucun chemin vers la nourriture n'est sûr (l'état d'arrivée ne permet pas de rejoindre la queue), l'agent suit sa propre queue via un second appel A* pour temporiser.
-6. Un flood fill (BFS) estime l'espace libre accessible pour éviter les culs-de-sac.
+5. **Stratégie de survie** : si aucun chemin vers la nourriture n'est sûr, l'agent suit sa propre queue (tail-chasing via un second appel A*) pour temporiser.
+6. Un **flood fill** (BFS) estime l'espace libre accessible pour éviter les culs-de-sac.
+
+**Performances mesurées (80 épisodes) :** score moyen 31.79, meilleur score 42, survie 98.75 %
 
 ### Q-Learning (apprentissage par renforcement)
 
@@ -287,6 +280,8 @@ Couverture :
 5. **Récompenses** : +10 (nourriture), −10 (mort), +1 (rapprochement), −1 (éloignement).
 6. La Q-table est sauvegardée dans `qtable.json` et rechargée automatiquement.
 
+**Performances mesurées (80 épisodes) :** score moyen 9.10, meilleur score 23, survie 88.75 %
+
 ---
 
 ## Structure du projet
@@ -295,89 +290,109 @@ Couverture :
 SnakeGAME_final/
 ├── backend/
 │   ├── agents/
-│   │   ├── agent_astar.py      # Agent A* avec tail-chasing et flood fill
-│   │   ├── agent_rl.py         # Agent Q-Learning avec encodage NumPy
-│   │   └── base_agent.py       # Classe abstraite Agent
+│   │   ├── agent_astar.py          # Agent A* : heapq, Manhattan, flood fill, tail-chasing
+│   │   ├── agent_rl.py             # Agent Q-Learning : Q-table JSON, 11 features NumPy uint8
+│   │   └── base_agent.py           # Classe abstraite Agent + AgentAleatoire
 │   ├── game_engine/
-│   │   ├── direction.py              # Enum Direction (HAUT/BAS/GAUCHE/DROITE)
-│   │   ├── grille.py                 # Grille + to_numpy_grid() NumPy
-│   │   ├── moteur.py                 # Moteur de jeu (step, reset, cause_mort)
-│   │   ├── serpent.py                # Logique du serpent
-│   │   ├── nourriture.py             # Classe Nourriture (diagramme de classes)
-│   │   ├── obstacle.py               # Classe Obstacle statique/dynamique
-│   │   ├── collecteur_statistiques.py # Agrégation des stats de parties
-│   │   └── controleur_jeu.py         # Façade ControleurJeu (diagramme de classes)
+│   │   ├── direction.py            # Enum Direction (HAUT/BAS/GAUCHE/DROITE) avec dx/dy
+│   │   ├── grille.py               # Grille 25×25 + to_numpy_grid() NumPy uint8
+│   │   ├── moteur.py               # MoteurJeu : step(), reset(), cause_mort
+│   │   ├── serpent.py              # Logique du serpent (corps list[dict])
+│   │   ├── nourriture.py           # Classe Nourriture (diagramme de classes)
+│   │   ├── obstacle.py             # Classe Obstacle statique/dynamique
+│   │   ├── collecteur_statistiques.py  # Agrégation statistiques parties
+│   │   └── controleur_jeu.py       # Façade ControleurJeu
 │   ├── models/
-│   │   ├── agent.py            # Table agents
-│   │   ├── game.py             # Table games (avec cause_mort, longueur_serpent…)
-│   │   ├── game_event.py       # Table game_events
-│   │   ├── rl_training.py      # Table rl_training
-│   │   └── stats.py            # Table agent_stats
+│   │   ├── agent.py                # ORM Table agents
+│   │   ├── game.py                 # ORM Table games
+│   │   ├── game_event.py           # ORM Table game_events
+│   │   ├── rl_training.py          # ORM Table rl_training
+│   │   └── stats.py                # ORM Table agent_stats
 │   ├── routes/
-│   │   ├── game_routes.py      # /api/game
-│   │   ├── agents_routes.py    # /api/agents
-│   │   ├── stats_routes.py     # /api/stats
-│   │   └── training_routes.py  # /api/training
+│   │   ├── game_routes.py          # /api/game
+│   │   ├── agents_routes.py        # /api/agent (init, step, save)
+│   │   ├── stats_routes.py         # /api/stats (comparison, history, replay)
+│   │   └── training_routes.py      # /api/training (run, results)
 │   ├── training/
-│   │   └── trainer.py          # Boucle d'entraînement RL + sauvegarde BDD
-│   ├── config.py               # Paramètres globaux (grille, RL, obstacles)
-│   ├── database.py             # Engine SQLite + SessionLocal
-│   ├── main.py                 # Point d'entrée FastAPI
-│   └── websocket_handler.py    # Boucle WebSocket temps réel
+│   │   └── trainer.py              # Boucle entraînement RL + sauvegarde BDD
+│   ├── config.py                   # Paramètres globaux (GRID_SIZE=25, RL params, CORS)
+│   ├── database.py                 # Engine SQLite + SessionLocal + seed 3 agents
+│   ├── main.py                     # App FastAPI, CORS, /ws, montage routeurs
+│   └── websocket_handler.py        # Boucle WebSocket asynchrone (delta protocol, orjson)
 ├── frontend/
 │   └── src/
 │       ├── components/
-│       │   ├── BattleArena.jsx     # Vue A* vs Q-Learning + heatmap post-battle
-│       │   ├── ControlPanel.jsx    # Panneau Start/Pause/Reset/Mode/Vitesse
-│       │   ├── Dashboard.jsx       # Dashboard score/steps/mode/état
-│       │   ├── GameGrid.jsx        # Canvas de la grille de jeu
-│       │   ├── ReplayViewer.jsx    # Lecteur de replay frame par frame
-│       │   ├── StatsComparison.jsx # Comparaison stats + export CSV/JSON/PDF
-│       │   └── TrainingPanel.jsx   # Panneau d'entraînement + mode performance
+│       │   ├── App.jsx             # Routeur SPA (WelcomeScreen / vues)
+│       │   ├── BattleArena.jsx     # Duel A* vs RL + graphiques Recharts
+│       │   ├── ControlPanel.jsx    # Start/Pause/Reset/Mode/Vitesse
+│       │   ├── Dashboard.jsx       # Score/steps/mode/état temps réel
+│       │   ├── GameGrid.jsx        # Container ResizeObserver → Snake
+│       │   ├── Snake.jsx           # Canvas bi-couche (fond + entités + FPS)
+│       │   ├── StatsComparison.jsx # Stats comparatives + export CSV/JSON
+│       │   └── TrainingPanel.jsx   # Entraînement RL/A* + toggle performance
 │       ├── hooks/
-│       │   └── useSoundEffects.js  # Sons Web Audio API (miam/boom/level-up)
+│       │   ├── useWebSocket.js     # Connexion WS, dispatch Redux, delta/full state
+│       │   └── useKeyboard.js      # Flèches + ZQSD → direction via WS
+│       ├── services/
+│       │   ├── api.js              # Axios, base URL http://localhost:8000
+│       │   └── websocket.js        # WSService + backoff exponentiel reconnexion
 │       ├── store/
-│       │   ├── gameSlice.js    # État du jeu (snake, food, score, grille 25×25)
-│       │   ├── statsSlice.js   # Statistiques comparatives (+ score médian)
-│       │   └── wsSlice.js      # État de la connexion WebSocket
+│       │   ├── gameSlice.js        # setGameState / applyDelta / setMode
+│       │   ├── statsSlice.js       # fetchTrainingResults (createAsyncThunk)
+│       │   ├── wsSlice.js          # connected, lastMessage
+│       │   └── uiSlice.js          # speed, view
 │       └── tests/
-│           ├── setup.js
+│           ├── setup.js            # Mocks globaux : ResizeObserver + Canvas getContext
 │           ├── gameSlice.test.js
 │           ├── uiSlice.test.js
-│           └── Dashboard.test.jsx
-├── tests/                      # Tests backend pytest (depuis la racine)
-│   ├── test_serpent.py         # Tests unitaires Serpent
-│   ├── test_grille.py          # Tests unitaires Grille
-│   ├── test_moteur.py          # Tests unitaires MoteurJeu
-│   ├── test_astar.py           # Tests unitaires AgentAStar
-│   ├── test_rl.py              # Tests unitaires AgentQL (Bellman, epsilon, Q-table)
-│   ├── test_api.py             # Tests d'intégration API REST
-│   └── backend/tests/          # Tests supplémentaires backend
-│       ├── test_functional.py      # Tests E2E sessions complètes
-│       ├── test_integration.py     # Tests SQLite + latences
-│       ├── test_classes_diagramme.py # Tests Nourriture/Obstacle/ControleurJeu
+│           ├── Dashboard.test.jsx
+│           ├── BattleArena.test.jsx
+│           └── TrainingPanel.test.jsx
+├── tests/                          # Tests backend pytest
+│   ├── test_serpent.py
+│   ├── test_grille.py
+│   ├── test_moteur.py
+│   ├── test_astar.py
+│   ├── test_rl.py
+│   └── test_api.py
+├── backend/
+│   └── tests/
+│       ├── test_functional.py      # E2E sessions complètes
+│       ├── test_integration.py     # SQLite + latences
+│       ├── test_classes_diagramme.py  # 39 tests diagramme de classes
 │       └── test_websocket.py       # Tests WebSocket
-├── start.bat                    # Script de lancement automatique (Windows)
-├── qtable.json                 # Q-table sauvegardée (générée à l'entraînement)
-├── training_results.csv        # Scores par épisode (généré à l'entraînement)
-├── snake.db                    # Base SQLite (générée au premier lancement)
-└── README.md
+├── docs/
+│   ├── rapport_conception_detaillee_final.md  # Conception détaillée + Mermaid
+│   ├── rapport_final_complet.md               # Rapport final + analyse écarts
+│   ├── MANUEL_INSTALLATION.md                 # → voir MANUEL_INSTALLATION.md (racine)
+│   ├── manuel_utilisation.md                  # Manuel utilisateur complet
+│   ├── schema_base_de_donnees.md              # Schéma BDD + requêtes types
+│   ├── diagramme_classes.md                   # Diagramme de classes ASCII
+│   └── diagramme_paquetages.md                # Diagramme de paquetages
+├── start.bat                       # Lancement automatique Windows
+├── start.sh                        # Lancement automatique Linux
+├── start.command                   # Lancement automatique macOS
+├── MANUEL_INSTALLATION.md          # Manuel d'installation Windows/Linux/macOS
+├── qtable.json                     # Q-table (générée après entraînement RL)
+├── training_results.csv            # Scores par épisode (générés à l'entraînement)
+└── snake.db                        # Base SQLite (générée au premier lancement)
 ```
 
 ---
 
 ## Base de données
 
-La base SQLite (`snake.db`) est créée automatiquement au démarrage du backend.
-Elle contient 5 tables :
+La base SQLite (`snake.db`) est créée automatiquement au démarrage du backend à la **racine du projet**.
 
 | Table | Contenu |
 |---|---|
-| `agents` | Types d'agents : humain, astar, rl |
+| `agents` | 3 agents : humain, astar, rl (créés automatiquement) |
 | `games` | Parties jouées (score, durée, cause_mort, longueur_serpent, taille_grille…) |
 | `game_events` | Événements détaillés par partie (move, food, collision) |
 | `agent_stats` | Statistiques agrégées par agent (score moyen, meilleur score, taux de survie) |
 | `rl_training` | Historique des épisodes d'entraînement RL (score, epsilon, alpha…) |
+
+Voir [docs/schema_base_de_donnees.md](docs/schema_base_de_donnees.md) pour le schéma complet.
 
 > Si vous avez une base existante sans les nouvelles tables, supprimez `snake.db` et relancez le backend.
 
@@ -392,5 +407,7 @@ Elle contient 5 tables :
 | WebSocket déconnecté | Relancer le backend, puis rafraîchir le frontend |
 | Q-table vide / mauvaises performances RL | Lancer un entraînement depuis le panneau Entraînement (au moins 50 épisodes) |
 | `snake.db` avec tables manquantes | Supprimer `snake.db`, relancer `uvicorn main:app --reload --port 8000` |
-| Tests frontend échouent | Lancer `npm install` dans `frontend/` pour installer Vitest et @testing-library |
-| Tests backend échouent | Lancer depuis la racine avec `pytest tests/ -v` (pas depuis le dossier `backend/`) |
+| Tests frontend échouent | Lancer `npm install` dans `frontend/` puis `npm test` |
+| Tests backend échouent | Lancer depuis la racine avec `python -m pytest tests/ -v` |
+| macOS : `start.command` bloqué | Clic droit → Ouvrir → Ouvrir quand même |
+| Python introuvable sur Linux/macOS | Utiliser `python3` et `pip3` à la place de `python` et `pip` |
