@@ -72,8 +72,9 @@ function Snake() {
   }, []);
 
   const [cellSize, setCellSize] = useState(() => {
-    const w = Math.max(300, window.innerWidth - 400);
-    const h = window.innerHeight * 0.78;
+    // sidebar 320 + gap 20 + padding conteneur 40 + padding interne 40 = ~420
+    const w = Math.max(200, window.innerWidth - 420);
+    const h = window.innerHeight * 0.75;
     return computeCellSize(w, h, gridSize || 25);
   });
 
@@ -228,7 +229,7 @@ function Snake() {
   const sizePx = gridSize * cellSize;
 
   return (
-    <div ref={wrapperRef} className="w-full overflow-hidden flex items-center justify-center">
+    <div ref={wrapperRef} className="w-full flex items-center justify-center">
     <div
       className="relative rounded-[2rem] border border-slate-700/80 shadow-[0_24px_70px_rgba(15,23,42,0.55)]"
       style={{ width: sizePx, height: sizePx }}
