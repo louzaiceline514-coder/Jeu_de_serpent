@@ -1,8 +1,5 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useSelector } from "react-redux";
-
-const CELL_SIZE_MANUAL = 30;
-const CELL_SIZE_AI = 30;
 
 function drawFood(ctx, x, y, cellSize) {
   const centerX = x * cellSize + cellSize / 2;
@@ -63,10 +60,28 @@ function drawSegment(ctx, x, y, cellSize, isHead) {
   ctx.fill();
 }
 
+// Calcule la taille de cellule pour que la grille 25×25 tienne dans le conteneur
+function computeCellSize(gridSize) {
+  const maxW = Math.floor((window.innerWidth - 370) * 0.96); // laisse place au panneau droit
+  const maxH = Math.floor(window.innerHeight * 0.80);
+  const maxCell = Math.floor(Math.min(maxW, maxH) / gridSize);
+  return Math.max(16, Math.min(28, maxCell)); // entre 16 et 28 px par cellule
+}
+
 function Snake() {
   const bgCanvasRef = useRef(null);
   const entityCanvasRef = useRef(null);
   const { snake, food, obstacles, dynamicObstacles, gridSize, mode, astarPath, rlPath } = useSelector((state) => state.game);
+
+  const [cellSize, setCellSize] = useState(() => computeCellSize(gridSize || 25));
+
+  // Recalcule si la fenêtre ou la grille changent
+  useEffect(() => {
+    const onResize = () => setCellSize(computeCellSize(gridSize || 25));
+    window.addEventListener("resize", onResize);
+    onResize();
+    return () => window.removeEventListener("resize", onResize);
+  }, [gridSize]);
 
   // FPS counter — ne ralentit pas le rendu, calcul purement temporel
   const fpsRef = useRef(0);
@@ -78,7 +93,6 @@ function Snake() {
     const canvas = bgCanvasRef.current;
     if (!canvas) return;
 
-    const cellSize = mode === "manual" ? CELL_SIZE_MANUAL : CELL_SIZE_AI;
     const ctx = canvas.getContext("2d");
     const size = gridSize * cellSize;
     canvas.width = size;
@@ -117,14 +131,13 @@ function Snake() {
       ctx.roundRect(left, top, sizePx, sizePx, Math.max(5, cellSize * 0.18));
       ctx.fill();
     });
-  }, [gridSize, obstacles, mode]);
+  }, [gridSize, obstacles, mode, cellSize]);
 
   // Couche 2 : obstacles dynamiques + nourriture + serpent + chemin A* + FPS
   useEffect(() => {
     const canvas = entityCanvasRef.current;
     if (!canvas) return;
 
-    const cellSize = mode === "manual" ? CELL_SIZE_MANUAL : CELL_SIZE_AI;
     const ctx = canvas.getContext("2d");
     const size = gridSize * cellSize;
     canvas.width = size;
@@ -208,9 +221,8 @@ function Snake() {
     ctx.fillText(`${fps} FPS`, size - 6, Math.max(14, cellSize * 0.55));
     ctx.restore();
 
-  }, [snake, food, dynamicObstacles, gridSize, mode, astarPath, rlPath]);
+  }, [snake, food, dynamicObstacles, gridSize, mode, astarPath, rlPath, cellSize]);
 
-  const cellSize = mode === "manual" ? CELL_SIZE_MANUAL : CELL_SIZE_AI;
   const sizePx = gridSize * cellSize;
 
   return (
