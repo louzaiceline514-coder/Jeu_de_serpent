@@ -12,7 +12,7 @@ from fastapi.responses import ORJSONResponse
 # `uvicorn main:app --reload --port 8000`
 # Donc on utilise des imports "absolus" relatifs au dossier backend (pas d'imports relatifs de package).
 from config import CORS_ORIGINS
-from database import Base, engine
+from database import Base, engine, run_migrations
 from routes.agents_routes import router as agents_router
 from routes.game_routes import router as game_router
 from routes.stats_routes import router as stats_router
@@ -20,8 +20,9 @@ from routes.training_routes import router as training_router
 from routes.agent_routes import router as agent_router
 from websocket_handler import GameWebSocketManager
 
-# Création des tables en base de données au démarrage
+# Création des tables et migrations au démarrage
 Base.metadata.create_all(bind=engine, checkfirst=True)
+run_migrations()
 
 app = FastAPI(title="Snake AI Backend", version="1.0.0", default_response_class=ORJSONResponse)
 
