@@ -71,7 +71,11 @@ function Snake() {
     return Math.max(14, Math.min(32, maxCell));
   }, []);
 
-  const [cellSize, setCellSize] = useState(20);
+  const [cellSize, setCellSize] = useState(() => {
+    const w = Math.max(300, window.innerWidth - 400);
+    const h = window.innerHeight * 0.78;
+    return computeCellSize(w, h, gridSize || 25);
+  });
 
   // ResizeObserver sur le wrapper w-full pour récupérer la largeur disponible réelle
   useEffect(() => {
@@ -224,7 +228,7 @@ function Snake() {
   const sizePx = gridSize * cellSize;
 
   return (
-    <div ref={wrapperRef} className="w-full flex items-center justify-center">
+    <div ref={wrapperRef} className="w-full overflow-hidden flex items-center justify-center">
     <div
       className="relative rounded-[2rem] border border-slate-700/80 shadow-[0_24px_70px_rgba(15,23,42,0.55)]"
       style={{ width: sizePx, height: sizePx }}
