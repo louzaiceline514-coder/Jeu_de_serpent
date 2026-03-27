@@ -6,7 +6,7 @@ import Snake from "./Snake";
 function GameGrid() {
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[72vh] space-y-4">
-      <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Aire de jeu</p>
+      <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Aire de jeu</p>
       <Snake />
     </div>
   );
