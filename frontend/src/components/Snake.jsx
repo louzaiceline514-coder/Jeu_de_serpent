@@ -60,28 +60,30 @@ function drawSegment(ctx, x, y, cellSize, isHead) {
   ctx.fill();
 }
 
-// Calcule la taille de cellule pour que la grille 25×25 tienne dans le conteneur
-function computeCellSize(gridSize) {
-  const maxW = Math.floor((window.innerWidth - 370) * 0.96); // laisse place au panneau droit
-  const maxH = Math.floor(window.innerHeight * 0.80);
-  const maxCell = Math.floor(Math.min(maxW, maxH) / gridSize);
-  return Math.max(16, Math.min(28, maxCell)); // entre 16 et 28 px par cellule
-}
-
 function Snake() {
   const bgCanvasRef = useRef(null);
   const entityCanvasRef = useRef(null);
+  const wrapperRef = useRef(null);
   const { snake, food, obstacles, dynamicObstacles, gridSize, mode, astarPath, rlPath } = useSelector((state) => state.game);
 
-  const [cellSize, setCellSize] = useState(() => computeCellSize(gridSize || 25));
+  const computeCellSize = useCallback((containerW, containerH, gSize) => {
+    const maxCell = Math.floor(Math.min(containerW, containerH) / gSize);
+    return Math.max(14, Math.min(32, maxCell));
+  }, []);
 
-  // Recalcule si la fenêtre ou la grille changent
+  const [cellSize, setCellSize] = useState(20);
+
+  // ResizeObserver sur le conteneur réel pour être vraiment responsive
   useEffect(() => {
-    const onResize = () => setCellSize(computeCellSize(gridSize || 25));
-    window.addEventListener("resize", onResize);
-    onResize();
-    return () => window.removeEventListener("resize", onResize);
-  }, [gridSize]);
+    const el = wrapperRef.current?.parentElement;
+    if (!el) return;
+    const obs = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setCellSize(computeCellSize(width - 16, height - 48, gridSize || 25));
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [gridSize, computeCellSize]);
 
   // FPS counter — ne ralentit pas le rendu, calcul purement temporel
   const fpsRef = useRef(0);
@@ -221,8 +223,9 @@ function Snake() {
   const sizePx = gridSize * cellSize;
 
   return (
+    <div ref={wrapperRef} className="w-full flex items-center justify-center">
     <div
-      className="relative mx-auto rounded-[2rem] border border-slate-700/80 shadow-[0_24px_70px_rgba(15,23,42,0.55)]"
+      className="relative rounded-[2rem] border border-slate-700/80 shadow-[0_24px_70px_rgba(15,23,42,0.55)]"
       style={{ width: sizePx, height: sizePx }}
     >
       <canvas
@@ -237,6 +240,7 @@ function Snake() {
         height={sizePx}
         className="absolute top-0 left-0 rounded-[2rem]"
       />
+    </div>
     </div>
   );
 }
