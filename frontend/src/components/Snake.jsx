@@ -66,7 +66,7 @@ function drawSegment(ctx, x, y, cellSize, isHead) {
 function Snake() {
   const bgCanvasRef = useRef(null);
   const entityCanvasRef = useRef(null);
-  const { snake, food, obstacles, dynamicObstacles, gridSize, mode, astarPath } = useSelector((state) => state.game);
+  const { snake, food, obstacles, dynamicObstacles, gridSize, mode, astarPath, rlPath } = useSelector((state) => state.game);
 
   // FPS counter — ne ralentit pas le rendu, calcul purement temporel
   const fpsRef = useRef(0);
@@ -150,6 +150,24 @@ function Snake() {
       });
     }
 
+    // --- Overlay chemin Q-Learning — affiché uniquement en mode rl ---
+    if (mode === "rl" && rlPath && rlPath.length > 0) {
+      rlPath.forEach(({ x, y }, index) => {
+        const alpha = 0.50 - (index / rlPath.length) * 0.38; // fondu progressif
+        ctx.fillStyle = `rgba(167, 139, 250, ${alpha.toFixed(2)})`; // violet semi-transparent
+        const pad = Math.floor(cellSize * 0.22);
+        ctx.beginPath();
+        ctx.roundRect(
+          x * cellSize + pad,
+          y * cellSize + pad,
+          cellSize - pad * 2,
+          cellSize - pad * 2,
+          Math.max(3, cellSize * 0.16),
+        );
+        ctx.fill();
+      });
+    }
+
     dynamicObstacles.forEach(({ x, y }) => {
       const left = x * cellSize + 3;
       const top = y * cellSize + 3;
@@ -185,7 +203,7 @@ function Snake() {
     ctx.fillText(`${fps} FPS`, size - 6, Math.max(14, cellSize * 0.55));
     ctx.restore();
 
-  }, [snake, food, dynamicObstacles, gridSize, mode, astarPath]);
+  }, [snake, food, dynamicObstacles, gridSize, mode, astarPath, rlPath]);
 
   const cellSize = mode === "manual" ? CELL_SIZE_MANUAL : CELL_SIZE_AI;
   const sizePx = gridSize * cellSize;

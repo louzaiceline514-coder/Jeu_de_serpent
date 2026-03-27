@@ -32,6 +32,7 @@ class AgentQL(Agent):
         self.epsilon = EPSILON_START if epsilon is None else epsilon
         self.q_table: Dict[str, List[float]] = {}
         self.actions = [Direction.GAUCHE, Direction.DROITE, Direction.HAUT, Direction.BAS]
+        self.last_path: List[Tuple[int, int]] = []
         self.charger_qtable()
 
     # ------------------ Gestion Q-table ------------------ #
@@ -173,7 +174,9 @@ class AgentQL(Agent):
             return moteur.serpent.direction
 
         if random.random() < self.epsilon:
-            return random.choice(safe_actions)
+            chosen = random.choice(safe_actions)
+            self.last_path = self._simulate_greedy_path(moteur, chosen)
+            return chosen
 
         scored_actions = []
         for index, direction in enumerate(self.actions):
@@ -192,10 +195,101 @@ class AgentQL(Agent):
         ]
 
         if len(meilleures) == 1:
+            self.last_path = self._simulate_greedy_path(moteur, meilleures[0])
             return meilleures[0]
 
         meilleures.sort(key=lambda direction: self._distance_to_food(moteur, direction))
+        self.last_path = self._simulate_greedy_path(moteur, meilleures[0])
         return meilleures[0]
+
+    # ------------------ Simulation chemin greedy (visualisation) ------------------ #
+
+    def _greedy_dir_from_pos(
+        self,
+        x: int,
+        y: int,
+        current_dir: Direction,
+        food: Optional[Tuple[int, int]],
+        obstacles: set,
+        corps_set: set,
+        visited: set,
+        w: int,
+        h: int,
+    ) -> Optional[Direction]:
+        """Choisit la direction greedy depuis une position simulée (Q-table + manhattan)."""
+        food_up = food_down = food_left = food_right = 0
+        if food:
+            fx, fy = food
+            if fy < y:
+                food_up = 1
+            elif fy > y:
+                food_down = 1
+            if fx < x:
+                food_left = 1
+            elif fx > x:
+                food_right = 1
+
+        def is_blocked(d: Direction) -> int:
+            nx2, ny2 = x + d.dx, y + d.dy
+            if not (0 <= nx2 < w and 0 <= ny2 < h):
+                return 1
+            if (nx2, ny2) in obstacles or (nx2, ny2) in corps_set or (nx2, ny2) in visited:
+                return 1
+            return 0
+
+        if current_dir == Direction.HAUT:
+            ms, ml, mr = Direction.HAUT, Direction.GAUCHE, Direction.DROITE
+        elif current_dir == Direction.BAS:
+            ms, ml, mr = Direction.BAS, Direction.DROITE, Direction.GAUCHE
+        elif current_dir == Direction.GAUCHE:
+            ms, ml, mr = Direction.GAUCHE, Direction.BAS, Direction.HAUT
+        else:
+            ms, ml, mr = Direction.DROITE, Direction.HAUT, Direction.BAS
+
+        state: StateKey = (
+            is_blocked(ms), is_blocked(ml), is_blocked(mr),
+            1 if current_dir == Direction.HAUT else 0,
+            1 if current_dir == Direction.BAS else 0,
+            1 if current_dir == Direction.GAUCHE else 0,
+            1 if current_dir == Direction.DROITE else 0,
+            food_up, food_down, food_left, food_right,
+        )
+        q_vals = self.obtenir_q_valeurs(state)
+        safe_dirs = [d for d in self.actions if not is_blocked(d)]
+        if not safe_dirs:
+            return None
+        return max(safe_dirs, key=lambda d: q_vals[self.actions.index(d)])
+
+    def _simulate_greedy_path(
+        self, moteur: MoteurJeu, first_dir: Direction, max_steps: int = 15
+    ) -> List[Tuple[int, int]]:
+        """Simule le chemin greedy sur max_steps pas (approximation sans copie moteur)."""
+        path: List[Tuple[int, int]] = []
+        x, y = moteur.serpent.tete
+        direction = first_dir
+        obstacles: set = set(moteur.grille.obstacles)
+        corps_set: set = set(moteur.serpent.corps)
+        food: Optional[Tuple[int, int]] = moteur.grille.nourriture
+        w, h = moteur.grille.largeur, moteur.grille.hauteur
+        visited: set = {(x, y)}
+
+        for _ in range(max_steps):
+            nx, ny = x + direction.dx, y + direction.dy
+            if not (0 <= nx < w and 0 <= ny < h):
+                break
+            if (nx, ny) in obstacles or (nx, ny) in corps_set or (nx, ny) in visited:
+                break
+            path.append((nx, ny))
+            visited.add((nx, ny))
+            x, y = nx, ny
+            if food and (x, y) == food:
+                break
+            next_dir = self._greedy_dir_from_pos(x, y, direction, food, obstacles, corps_set, visited, w, h)
+            if next_dir is None:
+                break
+            direction = next_dir
+
+        return path
 
     def update_Q(
         self,

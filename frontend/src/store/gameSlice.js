@@ -13,6 +13,7 @@ const initialState = {
   stepCount: 0,
   direction: "DROITE",
   astarPath: [],  // chemin planifié par A* pour la visualisation F6
+  rlPath: [],     // chemin prédit par Q-Learning
   etat: "en_cours",
 };
 
@@ -32,6 +33,7 @@ const gameSlice = createSlice({
       state.stepCount = payload.step_count ?? 0;
       state.direction = payload.direction || state.direction;
       state.astarPath = payload.astar_path || [];
+      state.rlPath = payload.rl_path || [];
       state.etat = payload.etat || "en_cours";
       if (payload.taille_grille) {
         const parsed = parseInt(payload.taille_grille.split("x")[0], 10);
@@ -49,6 +51,7 @@ const gameSlice = createSlice({
       if (d.step_count !== undefined) state.stepCount = d.step_count;
       if (d.direction !== undefined) state.direction = d.direction;
       if (d.astar_path !== undefined) state.astarPath = d.astar_path;
+      if (d.rl_path !== undefined) state.rlPath = d.rl_path;
       if (d.etat !== undefined) state.etat = d.etat;
     },
     setMode(state, action) {

@@ -118,11 +118,15 @@ class GameWebSocketManager:
                         self._enregistrer_partie()
                         self._game_saved = True
 
-                # Construire l'état et injecter le chemin A* (F6)
+                # Construire l'état et injecter le chemin A* (F6) ou RL
                 state_dict = self.engine.get_state_dict()
                 if self.engine.mode == "astar":
                     state_dict["astar_path"] = [
                         {"x": x, "y": y} for (x, y) in self.agent_astar.last_path
+                    ]
+                elif self.engine.mode == "rl":
+                    state_dict["rl_path"] = [
+                        {"x": x, "y": y} for (x, y) in self.agent_rl.last_path
                     ]
 
                 # Envoi : complet sur premier frame, delta sur les suivants
