@@ -91,6 +91,58 @@
 +---------------------------+
 
 
+## Classes du diagramme de conception
+
++---------------------------+         +---------------------------+
+|        Nourriture         |         |         Obstacle          |
++---------------------------+         +---------------------------+
+| - position: Coord|None    |         | - position: Coord         |
++---------------------------+         | - type_obstacle: str      |
+| + est_presente() -> bool  |         | - age: int                |
+| + placer(pos)             |         +---------------------------+
+| + effacer()               |         | + est_statique() -> bool  |
++---------------------------+         | + est_actif(lifetime)->bool|
+                                      | + vieillir()              |
+                                      +---------------------------+
+
++---------------------------------------+
+|            ControleurJeu              |
++---------------------------------------+
+| - _moteur: MoteurJeu                  |
+| - nourriture: Nourriture              |
+| - collecteur: CollecteurStatistiques  |
++---------------------------------------+
+| + reset(mode)                         |
+| + changer_direction(dir)              |
+| + step()                              |
+| + get_obstacles() -> list[Obstacle]   |
+| + get_state_dict() -> dict            |
+| + score: int  (property)              |
+| + game_over: bool  (property)         |
++---------------------------------------+
+              |           |
+              v           v
+        [MoteurJeu]  [CollecteurStatistiques]
+
++---------------------------------------+
+|         CollecteurStatistiques        |
++---------------------------------------+
+| - scores: list[int]                   |
+| - steps: list[int]                    |
+| - longueurs: list[int]                |
+| - causes_mort: list[str]              |
++---------------------------------------+
+| + enregistrer_partie(score,steps,...) |
+| + reinitialiser()                     |
+| + nb_parties: int  (property)         |
+| + score_moyen: float  (property)      |
+| + score_median: float  (property)     |
+| + meilleur_score: int  (property)     |
+| + taux_survie: float  (property)      |
+| + to_dict() -> dict                   |
++---------------------------------------+
+
+
 ## Modeles ORM (SQLAlchemy)
 
 +-------------------+       +-------------------+
