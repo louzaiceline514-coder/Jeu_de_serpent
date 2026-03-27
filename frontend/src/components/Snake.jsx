@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
 
 function drawFood(ctx, x, y, cellSize) {
@@ -60,36 +60,12 @@ function drawSegment(ctx, x, y, cellSize, isHead) {
   ctx.fill();
 }
 
-function Snake() {
+function Snake({ availableWidth = 500, availableHeight = 500 }) {
   const bgCanvasRef = useRef(null);
   const entityCanvasRef = useRef(null);
-  const wrapperRef = useRef(null);
   const { snake, food, obstacles, dynamicObstacles, gridSize, mode, astarPath, rlPath } = useSelector((state) => state.game);
 
-  const computeCellSize = useCallback((containerW, containerH, gSize) => {
-    const maxCell = Math.floor(Math.min(containerW, containerH) / gSize);
-    return Math.max(14, Math.min(32, maxCell));
-  }, []);
-
-  const [cellSize, setCellSize] = useState(() => {
-    // sidebar 320 + gap 20 + padding conteneur 40 + padding interne 40 = ~420
-    const w = Math.max(200, window.innerWidth - 420);
-    const h = window.innerHeight * 0.75;
-    return computeCellSize(w, h, gridSize || 25);
-  });
-
-  // ResizeObserver sur le wrapper w-full pour récupérer la largeur disponible réelle
-  useEffect(() => {
-    const el = wrapperRef.current;
-    if (!el) return;
-    const obs = new ResizeObserver(([entry]) => {
-      const w = entry.contentRect.width;
-      const h = window.innerHeight * 0.78;
-      setCellSize(computeCellSize(w - 8, h, gridSize || 25));
-    });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [gridSize, computeCellSize]);
+  const cellSize = Math.max(10, Math.floor(Math.min(availableWidth, availableHeight) / (gridSize || 25)));
 
   // FPS counter — ne ralentit pas le rendu, calcul purement temporel
   const fpsRef = useRef(0);
@@ -229,7 +205,7 @@ function Snake() {
   const sizePx = gridSize * cellSize;
 
   return (
-    <div ref={wrapperRef} className="w-full flex items-center justify-center">
+    <div className="flex items-center justify-center">
     <div
       className="relative rounded-[2rem] border border-slate-700/80 shadow-[0_24px_70px_rgba(15,23,42,0.55)]"
       style={{ width: sizePx, height: sizePx }}
