@@ -166,23 +166,18 @@ function Snake() {
     // --- Overlay chemin Q-Learning — affiché uniquement en mode rl ---
     if (mode === "rl" && rlPath && rlPath.length > 0) {
       rlPath.forEach(({ x, y }, index) => {
-        const alpha = 0.60 - (index / rlPath.length) * 0.45; // fondu progressif
-        const pad = Math.floor(cellSize * 0.18);
-        const rx = x * cellSize + pad;
-        const ry = y * cellSize + pad;
-        const rSize = cellSize - pad * 2;
-        const rRadius = Math.max(3, cellSize * 0.16);
-        // Remplissage violet
-        ctx.fillStyle = `rgba(167, 139, 250, ${alpha.toFixed(2)})`;
+        const alpha = 0.45 - (index / rlPath.length) * 0.35; // fondu progressif (identique à A*)
+        ctx.fillStyle = `rgba(167, 139, 250, ${alpha.toFixed(2)})`; // violet semi-transparent
+        const pad = Math.floor(cellSize * 0.22);
         ctx.beginPath();
-        ctx.roundRect(rx, ry, rSize, rSize, rRadius);
+        ctx.roundRect(
+          x * cellSize + pad,
+          y * cellSize + pad,
+          cellSize - pad * 2,
+          cellSize - pad * 2,
+          Math.max(3, cellSize * 0.16),
+        );
         ctx.fill();
-        // Contour léger pour le premier tiers du chemin
-        if (index < rlPath.length / 3) {
-          ctx.strokeStyle = `rgba(196, 181, 253, ${(alpha * 0.7).toFixed(2)})`;
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
       });
     }
 
