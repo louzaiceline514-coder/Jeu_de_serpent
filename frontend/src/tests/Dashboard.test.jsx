@@ -35,7 +35,7 @@ describe("Dashboard", () => {
 
   it("affiche le mode manuel par défaut", () => {
     renderWithStore(<Dashboard />);
-    expect(screen.getByText("manual")).toBeTruthy();
+    expect(screen.getByText("Manuel")).toBeTruthy();
   });
 
   it("affiche 'En cours' quand la partie est active", () => {
