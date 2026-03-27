@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import orjson
@@ -227,6 +228,11 @@ class GameWebSocketManager:
                 score=score,
                 nb_steps=nb_steps,
                 duration=duration,
+                longueur_serpent=len(self.engine.serpent.corps),
+                cause_mort=self.engine.cause_mort or "inconnu",
+                taille_grille=f"{self.engine.grille.largeur}x{self.engine.grille.hauteur}",
+                obstacles_actifs=len(self.engine.grille.obstacles) > 0,
+                date_fin=datetime.utcnow(),
             )
             db.add(game)
 

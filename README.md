@@ -242,11 +242,13 @@ Couverture :
 - `test_moteur.py` : cycle de jeu, step, reset, cause_mort
 - `test_astar.py` : chemin simple, heuristique Manhattan, obstacles, fallback survie
 - `test_rl.py` : encodage état (11 features), mise à jour Q-table, équation de Bellman, décroissance epsilon, sauvegarde/chargement Q-table
-- `test_classes_diagramme.py` : Nourriture, Obstacle, CollecteurStatistiques, ControleurJeu
+- `test_classes_diagramme.py` : Nourriture, Obstacle, CollecteurStatistiques, ControleurJeu, TypeCellule, EtatJeu, AgentAleatoire
 - `test_functional.py` : sessions complètes A*, RL et humain (E2E sans DB)
 - `test_integration.py` : persistance SQLite, flux agent-moteur, latences A* et RL
 - `test_api.py` : routes REST /api/health, /api/game, /api/stats, /api/agents
-- `test_websocket.py` : connexion WebSocket, messages start/step/reset
+- `test_websocket.py` : connexion WebSocket, messages binaires orjson, deltas game_delta, champs etat/astar_path
+
+**Total : 107 tests pytest (tous verts)**
 
 ### Tests frontend (Vitest)
 

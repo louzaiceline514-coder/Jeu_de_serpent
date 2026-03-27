@@ -48,12 +48,15 @@ function StatsComparison() {
   }, [dispatch]);
 
   useEffect(() => {
-    if (lastMessage?.type === "game_state" && lastMessage?.payload?.game_over) {
+    // Accepte game_state ET game_delta : le backend peut envoyer game_over via delta
+    const isGameOver =
+      (lastMessage?.type === "game_state" || lastMessage?.type === "game_delta") &&
+      lastMessage?.payload?.game_over;
+    if (isGameOver) {
       const timeoutId = window.setTimeout(() => {
         dispatch(fetchComparison());
         dispatch(fetchHistory());
       }, 250);
-
       return () => window.clearTimeout(timeoutId);
     }
     return undefined;

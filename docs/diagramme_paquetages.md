@@ -88,7 +88,7 @@ backend/
 +================================================================================+
 |
 +==[ tests/ ]====================================================================+
-|   Responsabilite : tests automatises (88 tests pytest)                         |
+|   Responsabilite : tests automatises (107 tests pytest)                        |
 |                                                                                |
 |   conftest.py             fixtures partagees (db, moteur, agent)               |
 |   test_serpent.py         tests unitaires Serpent                              |

@@ -46,7 +46,7 @@ et resultats obtenus, retour d'experience, conclusion sur les suites possibles, 
 | Battle Arena temps reel | Atteint | Duel A* vs Q-Learning avec graphiques |
 | Panneau entrainement RL | Atteint | Entrainement et benchmark depuis interface |
 | Page statistiques | Atteint | Comparaison A* vs Q-Learning, export CSV |
-| Tests automatises | Atteint | 88 tests pytest (unitaires, intégration, E2E, WebSocket) |
+| Tests automatises | Atteint | 107 tests pytest (unitaires, intégration, E2E, WebSocket) |
 | CI/CD GitHub Actions | Atteint | Pipeline automatique sur chaque push |
 
 Tous les objectifs techniques ont ete atteints.
