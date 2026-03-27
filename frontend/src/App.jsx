@@ -62,13 +62,13 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.10),_transparent_25%),radial-gradient(circle_at_top_right,_rgba(139,92,246,0.10),_transparent_28%),linear-gradient(180deg,_#0f172a_0%,_#1e293b_50%,_#0f172a_100%)]">
-      <header className="border-b border-slate-700 px-6 py-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between bg-slate-900/80 backdrop-blur">
+      <header className="border-b border-slate-700 px-6 py-4 flex flex-col gap-3 items-center xl:flex-row xl:justify-between bg-slate-900/80 backdrop-blur">
         <div>
           {/* Charte : Poppins pour le titre principal */}
           <h1 className="text-xl font-bold font-title text-slate-50">Snake AI Dashboard</h1>
           <p className="mt-1 text-xs uppercase tracking-[0.25em] text-slate-500 font-mono">SAE4 • UPJV</p>
         </div>
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center items-center">
           <nav className="space-x-2">
             {/* Charte : Emerald=Joueur, Blue=A*, Violet=RL, Amber=Obstacles/Warning */}
             <button

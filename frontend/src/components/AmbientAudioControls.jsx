@@ -80,7 +80,7 @@ function AmbientAudioControls() {
         </button>
         <button
           onClick={toggleMute}
-          className="rounded-full bg-gradient-to-r from-amber-400 to-emerald-400 px-3 py-1 font-medium text-slate-950"
+          className={`rounded-full px-3 py-1 font-medium text-white border ${isMuted ? "bg-red-500 border-red-400" : "bg-emerald-500 border-emerald-400"}`}
         >
           {isMuted ? "Activer" : "Couper"}
         </button>
