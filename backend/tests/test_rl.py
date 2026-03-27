@@ -45,15 +45,18 @@ def test_epsilon_greedy_exploitation():
     moteur = MoteurJeu()
     moteur.reset(mode="rl")
     etat = agent.encoder_etat(moteur)
-    # Force une valeur très haute pour Direction.DROITE dans la Q-table
+    # Choisit une action sûre dynamiquement pour ne pas dépendre
+    # de la position initiale du serpent (safe_actions filtre les murs/corps)
+    safe = agent._safe_actions(moteur)
+    assert safe, "Il doit y avoir au moins une action sûre au départ"
+    best_action = safe[0]
+    best_idx = agent.actions.index(best_action)
     key = agent._state_to_key(etat)
-    # actions = [GAUCHE, DROITE, HAUT, BAS] → DROITE est à l'index 1
-    droite_idx = agent.actions.index(Direction.DROITE)
     q_vals = [0.0] * len(agent.actions)
-    q_vals[droite_idx] = 100.0
+    q_vals[best_idx] = 100.0
     agent.q_table[key] = q_vals
     direction = agent.choisir_action({"engine": moteur})
-    assert direction == Direction.DROITE
+    assert direction == best_action
 
 
 def test_mise_a_jour_q_table():
