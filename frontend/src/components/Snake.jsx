@@ -73,13 +73,14 @@ function Snake() {
 
   const [cellSize, setCellSize] = useState(20);
 
-  // ResizeObserver sur le conteneur réel pour être vraiment responsive
+  // ResizeObserver sur le wrapper w-full pour récupérer la largeur disponible réelle
   useEffect(() => {
-    const el = wrapperRef.current?.parentElement;
+    const el = wrapperRef.current;
     if (!el) return;
     const obs = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      setCellSize(computeCellSize(width - 16, height - 48, gridSize || 25));
+      const w = entry.contentRect.width;
+      const h = window.innerHeight * 0.78;
+      setCellSize(computeCellSize(w - 8, h, gridSize || 25));
     });
     obs.observe(el);
     return () => obs.disconnect();
