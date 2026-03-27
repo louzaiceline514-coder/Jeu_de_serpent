@@ -19,6 +19,10 @@ def test_step_incremente_compteur():
     """Chaque step incrémente le compteur de pas."""
     moteur = MoteurJeu()
     moteur.reset(mode="manual")
+    # Vider les obstacles pour éviter une mort aléatoire sur les premiers steps
+    moteur.static_obstacles = set()
+    moteur.dynamic_obstacles = {}
+    moteur._refresh_obstacles()
     moteur.step()
     assert moteur.step_count == 1
     moteur.step()
