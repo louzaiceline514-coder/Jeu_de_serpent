@@ -208,7 +208,7 @@ function Snake({ availableWidth = 500, availableHeight = 500 }) {
     <div className="flex items-center justify-center">
     <div
       className="relative rounded-[2rem] border border-slate-700/80 shadow-[0_24px_70px_rgba(15,23,42,0.55)]"
-      style={{ width: sizePx, height: sizePx }}
+      style={{ width: sizePx, height: sizePx, maxWidth: '100%', maxHeight: '75vh' }}
     >
       <canvas
         ref={bgCanvasRef}

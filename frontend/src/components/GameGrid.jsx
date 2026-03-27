@@ -3,7 +3,10 @@ import Snake from "./Snake";
 
 function GameGrid() {
   const containerRef = useRef(null);
-  const [availableSize, setAvailableSize] = useState({ w: 500, h: 500 });
+  const [availableSize, setAvailableSize] = useState(() => ({
+    w: Math.max(200, window.innerWidth - 420),
+    h: window.innerHeight * 0.72,
+  }));
 
   useEffect(() => {
     const el = containerRef.current;
