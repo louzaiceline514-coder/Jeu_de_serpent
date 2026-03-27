@@ -164,8 +164,6 @@ function Snake() {
     }
 
     // --- Overlay chemin Q-Learning — affiché uniquement en mode rl ---
-    // eslint-disable-next-line no-console
-    if (mode === "rl") console.log("[Snake] rlPath:", rlPath?.length, rlPath?.[0]);
     if (mode === "rl" && rlPath && rlPath.length > 0) {
       rlPath.forEach(({ x, y }, index) => {
         const alpha = 0.45 - (index / rlPath.length) * 0.35; // fondu progressif (identique à A*)
