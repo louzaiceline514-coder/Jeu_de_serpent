@@ -18,6 +18,7 @@ class AgentAStar(Agent):
 
     def __init__(self) -> None:
         super().__init__(name="A*")
+        self.last_path: List[Coord] = []  # dernier chemin calculé (pour visualisation F6)
 
     def _heuristique(self, a: Coord, b: Coord) -> int:
         """Distance de Manhattan entre deux cases."""
@@ -270,6 +271,9 @@ class AgentAStar(Agent):
         nourriture = grille.nourriture
         current_direction = moteur.serpent.direction
 
+        # Réinitialise le chemin courant (pour la visualisation F6)
+        self.last_path = []
+
         if moteur.mode == "battle":
             return self._choose_battle_action(moteur)
 
@@ -293,6 +297,8 @@ class AgentAStar(Agent):
                 )
                 marge = espace - len(simulation[0])
                 if queue_path_len is not None and marge >= 4:
+                    # Stocker le chemin planifié (sans la case de tête) pour la visualisation
+                    self.last_path = chemin[1:]
                     return direction
 
         scores: List[Tuple[Tuple[int, int, int, int, int], Direction]] = []

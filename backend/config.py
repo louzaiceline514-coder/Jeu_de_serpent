@@ -67,6 +67,12 @@ OBSTACLE_SETTINGS: Dict[str, Dict[str, int]] = {
         "max_dynamic_obstacles": 0,
         "dynamic_lifetime": 0,
     },
+    "random": {
+        "static_obstacles": 8,
+        "spawn_interval": 6,
+        "max_dynamic_obstacles": 4,
+        "dynamic_lifetime": 10,
+    },
 }
 
 # Paramètres du Q-Learning

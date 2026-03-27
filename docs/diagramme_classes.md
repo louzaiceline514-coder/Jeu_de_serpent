@@ -13,24 +13,28 @@
 | + choisir_action(         |
 |     state: dict) -> str   |  <<abstract>>
 +---------------------------+
-         ^          ^
-         |          |
-+--------+---+  +---+----------+
-| AgentAStar |  |   AgentQL    |
-+------------+  +--------------+
-|            |  | qtable: dict |
-|            |  | epsilon: float|
-|            |  | alpha: float  |
-|            |  | gamma: float  |
-+------------+  +--------------+
-| + choisir_ |  | + choisir_   |
-|   action() |  |   action()   |
-| + _astar() |  | + encoder_   |
-| + _flood_  |  |   etat()     |
-|   fill()   |  | + maj_qtable()|
-| + _safe_   |  | + sauvegarder()|
-|   path()   |  | + charger()  |
-+------------+  +--------------+
+         ^          ^          ^
+         |          |          |
++--------+---+  +---+------+  +-----------+
+| AgentAStar |  |  AgentQL |  |AgentAleat.|
++------------+  +----------+  +-----------+
+| last_path: |  | qtable:  |  |           |
+|   list     |  |   dict   |  +-----------+
++------------+  | epsilon: |  |+choisir_  |
+| + choisir_ |  |   float  |  |  action() |
+|   action() |  | alpha:   |  |+_est_sur..|
+| + _astar() |  |   float  |  +-----------+
+| + _flood_  |  | gamma:   |
+|   fill()   |  |   float  |
+| + _safe_   |  +----------+
+|   path()   |  | + choisir_   |
++------------+  |   action()   |
+                | + encoder_   |
+                |   etat()     |
+                | + maj_qtable()|
+                | + sauvegarder()|
+                | + charger()  |
+                +--------------+
                       ^
                       |
                +------+------+
@@ -88,6 +92,20 @@
 +---------------------------+
 | + inverser() -> Direction |
 | + est_inverse(d) -> bool  |
++---------------------------+
+
+
++---------------------------+         +---------------------------+
+|        <<enum IntEnum>>   |         |        <<enum str>>       |
+|        TypeCellule        |         |         EtatJeu           |
++---------------------------+         +---------------------------+
+| VIDE = 0                  |         | EN_COURS = "en_cours"     |
+| SERPENT = 1               |         | GAME_OVER = "game_over"   |
+| NOURRITURE = 2            |         | PAUSE = "pause"           |
+| OBSTACLE = 3              |         +---------------------------+
++---------------------------+         | (sérialisable JSON natif) |
+| (utilisé dans to_numpy_   |         +---------------------------+
+|  grid() de Grille)        |
 +---------------------------+
 
 

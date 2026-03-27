@@ -7,6 +7,12 @@ import time
 from pathlib import Path
 from typing import Callable, List, Optional
 
+try:
+    import pandas as pd  # optionnel : génération du résumé statistique avancé
+    _HAS_PANDAS = True
+except ImportError:
+    _HAS_PANDAS = False
+
 from agents.agent_rl import AgentQL
 from database import SessionLocal
 from game_engine.moteur import MoteurJeu
@@ -89,3 +95,11 @@ class Trainer:
             writer.writerow(["episode", "score"])
             for i, score in enumerate(self._scores):
                 writer.writerow([i + 1, score])
+
+        # Résumé statistique avec Pandas si disponible
+        if _HAS_PANDAS and self._scores:
+            df = pd.DataFrame({"episode": range(1, len(self._scores) + 1), "score": self._scores})
+            summary = df["score"].describe()
+            summary_path = self.sortie_csv.with_name(self.sortie_csv.stem + "_summary.csv")
+            summary.to_csv(summary_path, header=["valeur"])
+            print(f"[Trainer] Résumé Pandas sauvegardé dans {summary_path}")

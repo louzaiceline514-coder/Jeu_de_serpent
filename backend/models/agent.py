@@ -14,6 +14,7 @@ class Agent(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
-    type = Column(String, nullable=False)  # "human" | "astar" | "rl"
+    type = Column(String, nullable=False)  # "human" | "astar" | "rl" | "random"
+    description = Column(String, nullable=True)  # description libre de l'agent
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 

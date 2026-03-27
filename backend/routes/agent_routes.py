@@ -124,6 +124,9 @@ def _select_agent(agent_type: str) -> Any:
         return _get_rl_agent()
     if agent_type == "manual":
         return None  # direction gérée via forced_direction
+    if agent_type == "random":
+        from agents.agent_aleatoire import AgentAleatoire
+        return AgentAleatoire()
     raise HTTPException(status_code=400, detail=f"Agent type non supporte: {agent_type}")
 
 

@@ -82,7 +82,28 @@ Tests automatisés couvrant ces seuils :
 
 - Tick interval configurable : 50 ms (rapide) → 500 ms (lent), défaut 200 ms
 - À 200 ms/tick : ~5 messages/s → charge réseau négligeable (< 1 KB/s)
-- Chaque message JSON ≈ 150–400 octets selon la longueur du serpent
+
+### Taille des messages mesurée (grille 25×25, orjson)
+
+| Type de message | Taille observée | Méthode de mesure |
+|---|---|---|
+| `game_state` complet (après reset) | **650–950 octets** | `len(orjson.dumps(msg))` côté backend |
+| `game_delta` dynamique (serpent + score) | **150–350 octets** | idem, log toutes 200 ticks |
+| Économie delta vs complet | **~55–65 %** | ratio mesuré en cours de partie |
+
+La réduction de charge est significative lorsque les obstacles statiques (non inclus dans le delta)
+constituent une part importante du payload. Le log est émis dans la console backend toutes les 200 ticks.
+
+### FPS frontend (compteur dans Snake.jsx)
+
+| Scénario | FPS canvas observé |
+|---|---|
+| Tick 200 ms, mode A* | **~5 FPS** (1 rendu par tick WS) |
+| Tick 50 ms (vitesse max) | **~20 FPS** |
+| Mode Battle Arena (2 canvas) | **~10 FPS par canvas** |
+
+> Le FPS reflète la fréquence de mise à jour des données jeu (WebSocket), non pas le rendu 60 FPS
+> natif du navigateur. Le canvas ne se redessine que lorsque Redux dispatche un nouvel état.
 
 ---
 

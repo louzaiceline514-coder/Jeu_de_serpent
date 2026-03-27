@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import time
+from typing import Any, Dict, List, Optional
 
-from typing import Any, Dict
-
+import orjson
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
@@ -21,6 +20,12 @@ from models.agent import Agent
 from models.game import Game
 from models.game_event import GameEvent
 from models.stats import AgentStats
+
+# Champs qui ne changent qu'au reset (envoyés uniquement dans le message "game_state" complet)
+_STATIC_KEYS = frozenset({"obstacles", "taille_grille", "obstacles_actifs", "mode"})
+
+# Compteur global pour le log périodique de la taille des messages (toutes 200 tick)
+_MSG_SIZE_LOG_INTERVAL = 200
 
 
 class GameWebSocketManager:
@@ -37,16 +42,44 @@ class GameWebSocketManager:
         self._game_saved = False
         self._replay_frames: list = []
         self._max_replay_frames = 1500
+        # Optimisation delta : après le premier état complet, on n'envoie que les champs dynamiques
+        self._static_sent: bool = False
+        self._tick_count: int = 0
+
+    # ------------------------------------------------------------------
+    # Sérialisation / delta
+    # ------------------------------------------------------------------
+
+    def _build_full_payload(self, state_dict: Dict[str, Any]) -> bytes:
+        """Construit le message complet JSON (premier frame ou après reset)."""
+        msg = {"type": "game_state", "payload": state_dict}
+        return orjson.dumps(msg)
+
+    def _build_delta_payload(self, state_dict: Dict[str, Any]) -> bytes:
+        """Construit un message delta avec uniquement les champs dynamiques."""
+        delta = {k: v for k, v in state_dict.items() if k not in _STATIC_KEYS}
+        msg = {"type": "game_delta", "payload": delta}
+        return orjson.dumps(msg)
+
+    def _log_msg_size(self, payload: bytes) -> None:
+        """Log périodique de la taille des messages WebSocket (toutes 200 ticks)."""
+        if self._tick_count % _MSG_SIZE_LOG_INTERVAL == 0:
+            print(f"[WS] tick={self._tick_count} msg_size={len(payload)} octets")
+
+    # ------------------------------------------------------------------
+    # Boucle principale
+    # ------------------------------------------------------------------
 
     async def handle(self, websocket: WebSocket) -> None:
         """Boucle principale de gestion du WebSocket."""
         await websocket.accept()
         self._running = True
 
-        # Envoie un premier état immédiatement
-        await websocket.send_text(
-            json.dumps({"type": "game_state", "payload": self.engine.get_state_dict()})
-        )
+        # Premier état complet immédiat
+        state_dict = self.engine.get_state_dict()
+        payload = self._build_full_payload(state_dict)
+        await websocket.send_bytes(payload)
+        self._static_sent = True
 
         producer_task = asyncio.create_task(self._tick_loop(websocket))
         consumer_task = asyncio.create_task(self._receive_loop(websocket))
@@ -66,6 +99,7 @@ class GameWebSocketManager:
         try:
             while self._running:
                 await asyncio.sleep(self._tick_ms / 1000.0)
+                self._tick_count += 1
 
                 if not self._paused and not self.engine.game_over:
                     # Choix d'action par l'IA si nécessaire
@@ -83,11 +117,23 @@ class GameWebSocketManager:
                         self._enregistrer_partie()
                         self._game_saved = True
 
-                message = {
-                    "type": "game_state",
-                    "payload": self.engine.get_state_dict(),
-                }
-                await websocket.send_text(json.dumps(message))
+                # Construire l'état et injecter le chemin A* (F6)
+                state_dict = self.engine.get_state_dict()
+                if self.engine.mode == "astar":
+                    state_dict["astar_path"] = [
+                        {"x": x, "y": y} for (x, y) in self.agent_astar.last_path
+                    ]
+
+                # Envoi : complet sur premier frame, delta sur les suivants
+                if not self._static_sent:
+                    payload = self._build_full_payload(state_dict)
+                    self._static_sent = True
+                else:
+                    payload = self._build_delta_payload(state_dict)
+
+                self._log_msg_size(payload)
+                await websocket.send_bytes(payload)
+
         except WebSocketDisconnect:
             self._running = False
         except Exception as e:
@@ -99,7 +145,7 @@ class GameWebSocketManager:
         try:
             while self._running:
                 raw = await websocket.receive_text()
-                data: Dict[str, Any] = json.loads(raw)
+                data: Dict[str, Any] = orjson.loads(raw)
                 msg_type = data.get("type")
 
                 if msg_type == "set_mode":
@@ -109,6 +155,7 @@ class GameWebSocketManager:
                     self._paused = True
                     self._game_saved = False
                     self._replay_frames = []
+                    self._static_sent = False  # prochain tick → état complet
                 elif msg_type == "direction":
                     dir_str = data.get("dir")
                     direction = self._parse_direction(dir_str)
@@ -122,6 +169,7 @@ class GameWebSocketManager:
                     self._paused = True
                     self._game_saved = False
                     self._replay_frames = []
+                    self._static_sent = False  # prochain tick → état complet
                 elif msg_type == "set_paused":
                     self._paused = bool(data.get("paused", False))
                 elif msg_type == "set_speed":
@@ -184,7 +232,6 @@ class GameWebSocketManager:
 
             stats = db.query(AgentStats).filter(AgentStats.agent_id == agent.id).first()
             if stats is None:
-                # Important : initialiser côté Python pour éviter les None avant flush/commit
                 stats = AgentStats(
                     agent_id=agent.id,
                     games_played=0,
@@ -194,7 +241,6 @@ class GameWebSocketManager:
                 )
                 db.add(stats)
 
-            # Sécurisation si une ancienne ligne DB contient des NULL
             if stats.games_played is None:
                 stats.games_played = 0
             if stats.avg_score is None:
@@ -222,12 +268,11 @@ class GameWebSocketManager:
 
             # Sauvegarde des frames de replay
             if self._replay_frames:
-                replay_start = time.time() - len(self._replay_frames) * (self._tick_ms / 1000.0)
                 for i, frame in enumerate(self._replay_frames):
                     db.add(GameEvent(
                         game_id=game.id,
                         type_evenement="frame",
-                        details_json=json.dumps(frame, separators=(",", ":")),
+                        details_json=orjson.dumps(frame).decode(),
                         timestamp=round(i * (self._tick_ms / 1000.0), 3),
                         score=frame.get("score", 0),
                         direction=frame.get("direction"),

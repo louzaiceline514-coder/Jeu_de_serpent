@@ -37,12 +37,19 @@ class WSService {
       if (onOpen) onOpen();
     };
 
-    this.ws.onmessage = (event) => {
+    this.ws.onmessage = async (event) => {
       try {
-        const data = JSON.parse(event.data);
+        let text;
+        if (event.data instanceof Blob) {
+          // Message binaire (orjson bytes depuis le backend)
+          text = await event.data.text();
+        } else {
+          text = event.data;
+        }
+        const data = JSON.parse(text);
         if (onMessage) onMessage(data);
       } catch (e) {
-        // Message non JSON, on ignore pour ce projet.
+        // Message non parseable, on ignore.
       }
     };
 

@@ -66,7 +66,12 @@ function drawSegment(ctx, x, y, cellSize, isHead) {
 function Snake() {
   const bgCanvasRef = useRef(null);
   const entityCanvasRef = useRef(null);
-  const { snake, food, obstacles, dynamicObstacles, gridSize, mode } = useSelector((state) => state.game);
+  const { snake, food, obstacles, dynamicObstacles, gridSize, mode, astarPath } = useSelector((state) => state.game);
+
+  // FPS counter — ne ralentit pas le rendu, calcul purement temporel
+  const fpsRef = useRef(0);
+  const lastFrameTimeRef = useRef(Date.now());
+  const frameCountRef = useRef(0);
 
   // Couche 1 : fond + grille + obstacles statiques (se redessine rarement)
   useEffect(() => {
@@ -114,7 +119,7 @@ function Snake() {
     });
   }, [gridSize, obstacles, mode]);
 
-  // Couche 2 : obstacles dynamiques + nourriture + serpent (se redessine à chaque tick)
+  // Couche 2 : obstacles dynamiques + nourriture + serpent + chemin A* + FPS
   useEffect(() => {
     const canvas = entityCanvasRef.current;
     if (!canvas) return;
@@ -126,6 +131,24 @@ function Snake() {
     canvas.height = size;
 
     ctx.clearRect(0, 0, size, size);
+
+    // --- Overlay chemin A* (F6) — affiché uniquement en mode astar ---
+    if (mode === "astar" && astarPath && astarPath.length > 0) {
+      astarPath.forEach(({ x, y }, index) => {
+        const alpha = 0.45 - (index / astarPath.length) * 0.35; // fondu progressif
+        ctx.fillStyle = `rgba(251, 191, 36, ${alpha.toFixed(2)})`; // ambre semi-transparent
+        const pad = Math.floor(cellSize * 0.22);
+        ctx.beginPath();
+        ctx.roundRect(
+          x * cellSize + pad,
+          y * cellSize + pad,
+          cellSize - pad * 2,
+          cellSize - pad * 2,
+          Math.max(3, cellSize * 0.16),
+        );
+        ctx.fill();
+      });
+    }
 
     dynamicObstacles.forEach(({ x, y }) => {
       const left = x * cellSize + 3;
@@ -144,7 +167,25 @@ function Snake() {
     snake.forEach(({ x, y }, index) => {
       drawSegment(ctx, x, y, cellSize, index === 0);
     });
-  }, [snake, food, dynamicObstacles, gridSize, mode]);
+
+    // --- Compteur FPS (coin supérieur droit) ---
+    frameCountRef.current += 1;
+    const now = Date.now();
+    const elapsed = now - lastFrameTimeRef.current;
+    if (elapsed >= 1000) {
+      fpsRef.current = Math.round((frameCountRef.current * 1000) / elapsed);
+      frameCountRef.current = 0;
+      lastFrameTimeRef.current = now;
+    }
+    const fps = fpsRef.current;
+    ctx.save();
+    ctx.font = `bold ${Math.max(10, cellSize * 0.45)}px monospace`;
+    ctx.textAlign = "right";
+    ctx.fillStyle = "rgba(148, 163, 184, 0.70)";
+    ctx.fillText(`${fps} FPS`, size - 6, Math.max(14, cellSize * 0.55));
+    ctx.restore();
+
+  }, [snake, food, dynamicObstacles, gridSize, mode, astarPath]);
 
   const cellSize = mode === "manual" ? CELL_SIZE_MANUAL : CELL_SIZE_AI;
   const sizePx = gridSize * cellSize;

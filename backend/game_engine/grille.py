@@ -8,6 +8,7 @@ from typing import List, Optional, Set, Tuple
 import numpy as np
 
 from .direction import Direction
+from .type_cellule import TypeCellule
 
 Coord = Tuple[int, int]
 
@@ -89,16 +90,16 @@ class Grille:
 
         for x, y in self.obstacles:
             if 0 <= y < self.hauteur and 0 <= x < self.largeur:
-                grid[y, x] = 3
+                grid[y, x] = TypeCellule.OBSTACLE
 
         if self.nourriture is not None:
             fx, fy = self.nourriture
             if 0 <= fy < self.hauteur and 0 <= fx < self.largeur:
-                grid[fy, fx] = 2
+                grid[fy, fx] = TypeCellule.NOURRITURE
 
         for x, y in corps:
             if 0 <= y < self.hauteur and 0 <= x < self.largeur:
-                grid[y, x] = 1
+                grid[y, x] = TypeCellule.SERPENT
 
         return grid
 

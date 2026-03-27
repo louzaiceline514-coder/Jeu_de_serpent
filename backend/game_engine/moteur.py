@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Tuple
 
 from config import GRID_SIZE, OBSTACLE_SETTINGS
 from game_engine.direction import Direction
+from game_engine.etat_jeu import EtatJeu
 from game_engine.grille import Grille
 from game_engine.serpent import Serpent
 
@@ -121,6 +122,11 @@ class MoteurJeu:
         self._init_obstacles()
         self.grille.generer_nourriture(forbidden=self._forbidden_cells() | self.grille.obstacles)
 
+    @property
+    def etat(self) -> EtatJeu:
+        """Retourne l'état courant du jeu sous forme d'enum EtatJeu."""
+        return EtatJeu.GAME_OVER if self.game_over else EtatJeu.EN_COURS
+
     def changer_direction(self, direction: Direction) -> None:
         """Met a jour la direction du serpent."""
         self.serpent.changer_direction(direction)
@@ -199,4 +205,6 @@ class MoteurJeu:
             "step_count": state.step_count,
             "direction": state.direction,
             "growth_pending": state.growth_pending,
+            "etat": self.etat.value,
+            "astar_path": [],  # rempli par AgentAStar dans websocket_handler
         }

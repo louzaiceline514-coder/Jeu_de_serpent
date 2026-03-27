@@ -113,6 +113,33 @@ Les outils utilises etaient adaptes : Python/FastAPI pour un backend rapide, Rea
 pour la reactivite de l'interface, SQLite pour la simplicite de deploiement, GitHub Actions
 pour l'integration continue. Vitest s'est revele plus rapide que Jest pour les tests frontend.
 
+**Choix WebSocket natif plutot que Socket.IO :**
+
+Le CDC mentionnait Socket.IO comme option, mais nous avons choisi le WebSocket natif
+FastAPI pour trois raisons concretes : (1) FastAPI integre nativement le support
+WebSocket via Starlette sans dependance supplementaire ; (2) Socket.IO impose un
+protocole d'enveloppe qui ajoute ~10-30 % de surcharge par message, alors que notre
+application envoie des frames frequentes (~5-20/s) ; (3) Socket.IO.js alourdirait
+le bundle frontend de ~80 Ko minifie, alors que le WebSocket natif du navigateur est
+sans cout. La reconnexion automatique a ete reimplantee avec un backoff exponentiel
+dans WSService, ce qui equivaut fonctionnellement a Socket.IO.
+
+**Fonctions non implementees — analyse MoSCoW :**
+
+La methode MoSCoW (Must/Should/Could/Won't) a guide la priorisation :
+
+| Fonctionnalite | Priorite MoSCoW | Decision | Justification |
+|---|---|---|---|
+| F1-F5 (jeu, A*, RL, interface, BDD) | Must | Implemente | Coeur du projet |
+| F6 (visualisation chemin A*) | Should | Implemente | Overlay ambre en mode A*, chemin planifie visible en temps reel |
+| F7 (DQN/reseau de neurones) | Could | Non implemente | Necessite PyTorch + GPU ; complexite tres elevee hors scope SAE |
+| F9 (3e agent, aleatoire) | Should | Implemente | AgentAleatoire : reference inferieure pour les benchmarks |
+| Multijoueur en ligne | Won't | Non implemente | Hors scope pour ce projet |
+
+L'absence de F7 (DQN) est un choix delibere : la SAE vise a comparer les approches,
+pas a optimiser une seule. La Q-table tabulaire est suffisante pour cette demonstration
+et reste explicable (lookup O(1), 11 features interpretables).
+
 ---
 
 ### 2.4 Limites du modele

@@ -44,6 +44,8 @@ backend/
 |   serpent.py          Serpent   -- deplacement, croissance, collisions         |
 |   grille.py           Grille    -- generation nourriture, obstacles, numpy     |
 |   direction.py        Direction -- enum (HAUT/BAS/GAUCHE/DROITE)              |
+|   type_cellule.py     TypeCellule -- IntEnum (VIDE/SERPENT/NOURRITURE/OBSTACLE)|
+|   etat_jeu.py         EtatJeu   -- enum str (EN_COURS/GAME_OVER/PAUSE)        |
 |   nourriture.py       Nourriture-- position et etat de la nourriture          |
 |   obstacle.py         Obstacle  -- obstacle statique ou dynamique, age        |
 |   controleur_jeu.py   ControleurJeu -- facade assemblee les composants        |
@@ -54,8 +56,9 @@ backend/
 |   Responsabilite : algorithmes IA, independants du moteur de jeu               |
 |                                                                                |
 |   base_agent.py       Agent (classe abstraite)                                 |
-|   agent_astar.py      AgentAStar  -- A*, heapq, Manhattan, flood fill         |
+|   agent_astar.py      AgentAStar  -- A*, heapq, Manhattan, flood fill, last_path|
 |   agent_rl.py         AgentQL     -- Q-table, epsilon-greedy, 11 features     |
+|   agent_aleatoire.py  AgentAleatoire -- directions sures aleatoires (F9)      |
 |   joueur_humain.py    JoueurHumain-- passe-plat pour la direction manuelle    |
 +================================================================================+
 |
