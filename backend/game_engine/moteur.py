@@ -207,4 +207,5 @@ class MoteurJeu:
             "growth_pending": state.growth_pending,
             "etat": self.etat.value,
             "astar_path": [],  # rempli par AgentAStar dans websocket_handler
+            "rl_path": [],     # rempli par AgentQL dans websocket_handler
         }
